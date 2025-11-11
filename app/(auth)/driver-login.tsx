@@ -1,13 +1,22 @@
-import { useAuth } from '@/src/contexts/AuthContext';
-import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import React, { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAuth } from "@/src/contexts/AuthContext";
+import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
+import React, { useState } from "react";
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function DriverLoginScreen() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -16,30 +25,30 @@ export default function DriverLoginScreen() {
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
-      Alert.alert('Error', 'Please fill in all fields');
+      Alert.alert("Error", "Please fill in all fields");
       return;
     }
 
     try {
       setIsLoading(true);
-      
+
       await login({
         email: email.trim(),
         password: password.trim(),
-        role: 'driver'
+        role: "driver",
       });
-      
+
       // Navigation will be handled by the auth context
-      router.replace('/(driver)/dashboard');
+      router.replace("/(driver)/dashboard");
     } catch (error: any) {
-      Alert.alert('Login Failed', error.message || 'Please check your credentials and try again');
+      Alert.alert("Login Failed", error.message || "Please check your credentials and try again");
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleRegister = () => {
-    router.push('/(auth)/driver-register');
+    router.push("/(auth)/driver-register");
   };
 
   const handleBack = () => {
@@ -48,15 +57,12 @@ export default function DriverLoginScreen() {
 
   const handleForgotPassword = () => {
     // TODO: Implement forgot password
-    Alert.alert('Coming Soon', 'Password reset will be available soon');
+    Alert.alert("Coming Soon", "Password reset will be available soon");
   };
 
   return (
     <SafeAreaView className="flex-1 bg-white">
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        className="flex-1"
-      >
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} className="flex-1">
         <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
           {/* Header */}
           <View className="flex-row items-center px-6 py-4">
@@ -72,13 +78,9 @@ export default function DriverLoginScreen() {
               <View className="w-20 h-20 bg-black rounded-2xl items-center justify-center mb-6">
                 <Ionicons name="car" size={40} color="white" />
               </View>
-              
-              <Text className="text-2xl font-bold text-black mb-2">
-                Welcome Back 👋
-              </Text>
-              <Text className="text-gray-600 text-center">
-                Please enter your details.
-              </Text>
+
+              <Text className="text-2xl font-bold text-black mb-2">Welcome Back 👋</Text>
+              <Text className="text-gray-600 text-center">Please enter your details.</Text>
             </View>
 
             {/* Form */}
@@ -109,39 +111,27 @@ export default function DriverLoginScreen() {
                     autoCapitalize="none"
                     autoCorrect={false}
                   />
-                  <TouchableOpacity
-                    onPress={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-3"
-                  >
-                    <Ionicons 
-                      name={showPassword ? "eye-off" : "eye"} 
-                      size={20} 
-                      color="#6b7280" 
-                    />
+                  <TouchableOpacity onPress={() => setShowPassword(!showPassword)} className="absolute right-4 top-3">
+                    <Ionicons name={showPassword ? "eye-off" : "eye"} size={20} color="#6b7280" />
                   </TouchableOpacity>
                 </View>
               </View>
 
               {/* Remember Me & Forgot Password */}
               <View className="flex-row items-center justify-between mt-5">
-                <TouchableOpacity
-                  onPress={() => setRememberMe(!rememberMe)}
-                  className="flex-row items-center"
-                >
-                  <View className={`w-5 h-5 rounded border-2 mr-2 items-center justify-center ${
-                    rememberMe ? 'bg-black border-black' : 'border-gray-300'
-                  }`}>
-                    {rememberMe && (
-                      <Ionicons name="checkmark" size={12} color="white" />
-                    )}
+                <TouchableOpacity onPress={() => setRememberMe(!rememberMe)} className="flex-row items-center">
+                  <View
+                    className={`w-5 h-5 rounded border-2 mr-2 items-center justify-center ${
+                      rememberMe ? "bg-black border-black" : "border-gray-300"
+                    }`}
+                  >
+                    {rememberMe && <Ionicons name="checkmark" size={12} color="white" />}
                   </View>
                   <Text className="text-black">Remember me</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity onPress={handleForgotPassword}>
-                  <Text className="text-black font-medium">
-                    Forgot password?
-                  </Text>
+                  <Text className="text-black font-medium">Forgot password?</Text>
                 </TouchableOpacity>
               </View>
 
@@ -150,18 +140,16 @@ export default function DriverLoginScreen() {
                 onPress={handleLogin}
                 disabled={isLoading}
                 className={`rounded-xl py-4 items-center mt-6 border-2 ${
-                  isLoading ? 'bg-gray-400 border-gray-400' : 'bg-black border-black'
+                  isLoading ? "bg-gray-400 border-gray-400" : "bg-black border-black"
                 }`}
                 activeOpacity={0.8}
               >
-                <Text className="text-white font-semibold text-lg">
-                  {isLoading ? 'Logging in...' : 'Login'}
-                </Text>
+                <Text className="text-white font-semibold text-lg">{isLoading ? "Logging in..." : "Login"}</Text>
               </TouchableOpacity>
 
               {/* Register Link */}
               <View className="flex-row justify-center mt-6">
-                <Text className="text-gray-600">Don't have an account? </Text>
+                <Text className="text-gray-600">Don&apos;t have an account? </Text>
                 <TouchableOpacity onPress={handleRegister}>
                   <Text className="text-black font-semibold">Sign up</Text>
                 </TouchableOpacity>
@@ -175,10 +163,8 @@ export default function DriverLoginScreen() {
                 <Text className="text-black font-semibold ml-2">Driver Requirements</Text>
               </View>
               <Text className="text-gray-700 text-sm leading-5">
-                • Valid driver's license{'\n'}
-                • Tricycle registration documents{'\n'}
-                • Valid government ID{'\n'}
-                • Account verification required
+                • Valid driver&apos;s license{"\n"}• Tricycle registration documents{"\n"}• Valid government ID{"\n"}•
+                Account verification required
               </Text>
             </View>
           </View>

@@ -8,7 +8,7 @@ export default function StudentProfileScreen() {
       <View className="flex-1 justify-center items-center px-6">
         <Text className="text-2xl font-bold text-gray-900 mb-4">Student Profile</Text>
         <Text className="text-gray-600 text-center">
-          This screen will contain the student's profile information and settings.
+          This screen will contain the student&apos;s profile information and settings.
         </Text>
       </View>
     </SafeAreaView>

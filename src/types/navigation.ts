@@ -40,6 +40,8 @@ export type DriverStackParamList = {
 
 declare global {
   namespace ReactNavigation {
-    interface RootParamList extends RootStackParamList {}
+    interface RootParamList extends RootStackParamList {
+      // This interface extends RootStackParamList for type safety
+    }
   }
 }

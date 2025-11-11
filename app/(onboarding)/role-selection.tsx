@@ -61,7 +61,7 @@ export default function RoleSelectionScreen() {
               </View>
               <View className="flex-1">
                 <Text className="text-white font-bold text-xl mb-1">
-                  I'm a Student
+                  I&apos;m a Student
                 </Text>
                 <Text className="text-gray-300 text-base">
                   Book rides to and from school
@@ -83,7 +83,7 @@ export default function RoleSelectionScreen() {
               </View>
               <View className="flex-1">
                 <Text className="text-black font-bold text-xl mb-1">
-                  I'm a Driver
+                  I&apos;m a Driver
                 </Text>
                 <Text className="text-gray-600 text-base">
                   Provide tricycle rides and earn

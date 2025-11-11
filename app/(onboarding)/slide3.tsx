@@ -1,12 +1,12 @@
-import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import React from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
+import React from "react";
+import { Text, TouchableOpacity, View, Image } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function Slide3Screen() {
   const handleGetStarted = () => {
-    router.push('/(onboarding)/role-selection');
+    router.push("/(onboarding)/role-selection");
   };
 
   const handleBack = () => {
@@ -37,26 +37,19 @@ export default function Slide3Screen() {
         {/* Illustration */}
         <View className="w-80 h-80 bg-gray-100 rounded-3xl items-center justify-center mb-12">
           <View className="items-center">
-            <Ionicons name="shield-checkmark" size={80} color="#000000" />
-            <View className="mt-4 flex-row items-center space-x-2">
-              <Ionicons name="star" size={20} color="#000000" />
-              <Ionicons name="star" size={20} color="#000000" />
-              <Ionicons name="star" size={20} color="#000000" />
-              <Ionicons name="star" size={20} color="#000000" />
-              <Ionicons name="star" size={20} color="#000000" />
+            <View className="items-center">
+              <Image source={require("@/assets/images/Privacy.png")} className="w-80 h-80" resizeMode="contain" />
             </View>
           </View>
         </View>
 
         {/* Title */}
-        <Text className="text-3xl font-bold text-black text-center mb-6">
-          Safe & Reliable Service
-        </Text>
+        <Text className="text-3xl font-bold text-black text-center mb-6">Safe & Reliable Service</Text>
 
         {/* Description */}
         <Text className="text-lg text-gray-600 text-center leading-7 mb-12">
-          All our drivers are verified and rated by the community. 
-          Track your ride in real-time and enjoy peace of mind with every journey.
+          All our drivers are verified and rated by the community. Track your ride in real-time and enjoy peace of mind
+          with every journey.
         </Text>
       </View>
 

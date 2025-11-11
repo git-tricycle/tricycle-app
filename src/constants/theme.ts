@@ -56,27 +56,41 @@ export const SemanticColors = {
   borderAccent: '#000000',    // Black for emphasis
 };
 
+// Poppins Font Family (Local Files)
+export const FontFamily = {
+  light: 'Poppins-Light',
+  regular: 'Poppins-Regular',
+  medium: 'Poppins-Medium',
+  semiBold: 'Poppins-SemiBold',
+  bold: 'Poppins-Bold',
+  extraBold: 'Poppins-ExtraBold',
+  black: 'Poppins-Black',
+} as const;
+
 export const Fonts = Platform.select({
   ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
-    sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
-    serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
-    rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
-    mono: 'ui-monospace',
+    /** Poppins as primary font family */
+    sans: FontFamily.regular,
+    serif: FontFamily.regular,
+    rounded: FontFamily.medium,
+    mono: 'Menlo',
+  },
+  android: {
+    sans: FontFamily.regular,
+    serif: FontFamily.regular,
+    rounded: FontFamily.medium,
+    mono: 'monospace',
   },
   default: {
-    sans: 'normal',
-    serif: 'serif',
-    rounded: 'normal',
+    sans: FontFamily.regular,
+    serif: FontFamily.regular,
+    rounded: FontFamily.medium,
     mono: 'monospace',
   },
   web: {
-    sans: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-    serif: "Georgia, 'Times New Roman', serif",
-    rounded: "'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif",
+    sans: `${FontFamily.regular}, 'Poppins', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif`,
+    serif: `${FontFamily.regular}, 'Poppins', Georgia, 'Times New Roman', serif`,
+    rounded: `${FontFamily.medium}, 'Poppins', 'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif`,
     mono: "SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
   },
 });

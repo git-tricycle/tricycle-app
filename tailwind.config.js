@@ -10,6 +10,17 @@ module.exports = {
   presets: [require("nativewind/preset")],
   theme: {
     extend: {
+      fontFamily: {
+        // Poppins font family (local files)
+        'sans': ['Poppins-Regular', 'Poppins', 'system-ui', 'sans-serif'],
+        'poppins': ['Poppins-Regular', 'Poppins'],
+        'poppins-light': ['Poppins-Light', 'Poppins'],
+        'poppins-medium': ['Poppins-Medium', 'Poppins'],
+        'poppins-semibold': ['Poppins-SemiBold', 'Poppins'],
+        'poppins-bold': ['Poppins-Bold', 'Poppins'],
+        'poppins-extrabold': ['Poppins-ExtraBold', 'Poppins'],
+        'poppins-black': ['Poppins-Black', 'Poppins'],
+      },
       colors: {
         // Black and White Palette
         primary: {

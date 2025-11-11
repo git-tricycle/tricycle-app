@@ -273,7 +273,7 @@ export default function DriverRegisterScreen() {
           <Text className="text-black font-semibold ml-2">Almost Done!</Text>
         </View>
         <Text className="text-gray-700 text-sm leading-5">
-          You're about to complete your driver registration. After submission, you can start using the app immediately.
+          You&apos;re about to complete your driver registration. After submission, you can start using the app immediately.
         </Text>
       </View>
     </View>

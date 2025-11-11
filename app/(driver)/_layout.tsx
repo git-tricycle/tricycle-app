@@ -1,17 +1,22 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
 import { Ionicons } from '@expo/vector-icons';
+import { Colors } from '@/src/constants/theme';
+import { useColorScheme } from '@/src/hooks/use-color-scheme';
 
 export default function DriverTabLayout() {
+  const colorScheme = useColorScheme();
+  
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#059669',
+        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint, // Black
+        tabBarInactiveTintColor: Colors[colorScheme ?? 'light'].tabIconDefault, // Light gray
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: 'white',
+          backgroundColor: Colors[colorScheme ?? 'light'].background, // White
           borderTopWidth: 1,
-          borderTopColor: '#E5E7EB',
+          borderTopColor: Colors[colorScheme ?? 'light'].border, // Light gray
         },
       }}>
       <Tabs.Screen
