@@ -56,6 +56,8 @@ export default function RideHistoryScreen() {
         status: filter === "all" ? undefined : filter,
         limit: 50,
         page: 1,
+        fields:
+          "id,pickup,dropoff,fare,paymentMode,status,createdAt,driver.firstName,driver.lastName,rating.rating,rating.comment",
       });
 
       if (response.success && response.data) {

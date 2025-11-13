@@ -1,4 +1,4 @@
-import { getApiBaseUrl } from './config';
+import { getApiBaseUrl } from "./config";
 
 // API Base Configuration
 const API_BASE_URL = getApiBaseUrl();
@@ -14,7 +14,7 @@ export interface PaginationParams {
   page?: number;
   limit?: number;
   sort?: string;
-  order?: 'asc' | 'desc';
+  order?: "asc" | "desc";
 }
 
 export interface SearchParams extends PaginationParams {
@@ -27,32 +27,52 @@ export const TokenStorage = {
   async getToken(): Promise<string | null> {
     try {
       // For now we'll use AsyncStorage, but you can implement SecureStore later
-      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-      return await AsyncStorage.getItem('authToken');
+      const AsyncStorage = require("@react-native-async-storage/async-storage").default;
+      return await AsyncStorage.getItem("authToken");
     } catch (error) {
-      console.error('Error getting token:', error);
+      console.error("Error getting token:", error);
       return null;
     }
   },
 
   async setToken(token: string): Promise<void> {
     try {
-      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-      await AsyncStorage.setItem('authToken', token);
+      const AsyncStorage = require("@react-native-async-storage/async-storage").default;
+      await AsyncStorage.setItem("authToken", token);
     } catch (error) {
-      console.error('Error setting token:', error);
+      console.error("Error setting token:", error);
     }
   },
 
   async removeToken(): Promise<void> {
     try {
-      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-      await AsyncStorage.removeItem('authToken');
+      const AsyncStorage = require("@react-native-async-storage/async-storage").default;
+      await AsyncStorage.removeItem("authToken");
     } catch (error) {
-      console.error('Error removing token:', error);
+      console.error("Error removing token:", error);
     }
   },
 };
+
+function serializeHeaders(headers: Headers): Record<string, string> {
+  const serialized: Record<string, string> = {};
+  headers.forEach((value, key) => {
+    serialized[key] = value;
+  });
+  return serialized;
+}
+
+function createApiError(status: number, body: any, fallbackMessage: string) {
+  const message =
+    (typeof body === "object" && body?.message) ||
+    (typeof body === "string" && body.trim()) ||
+    fallbackMessage;
+
+  const error = new Error(message);
+  (error as any).status = status;
+  (error as any).body = body;
+  return error;
+}
 
 // Base API Client
 export class ApiClient {
@@ -78,7 +98,7 @@ export class ApiClient {
   private async getHeaders(): Promise<Record<string, string>> {
     const token = await TokenStorage.getToken();
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     };
 
     if (token) {
@@ -110,11 +130,11 @@ export class ApiClient {
       }
 
       const headers = await this.getHeaders();
-      
-      console.log('Making API request to:', url);
-      console.log('Request headers:', headers);
-      console.log('Request body:', fetchOptions.body);
-      
+
+      console.log("Making API request to:", url);
+      console.log("Request headers:", { ...headers, ...fetchOptions.headers });
+      console.log("Request body:", fetchOptions.body);
+
       const response = await fetch(url, {
         ...fetchOptions,
         headers: {
@@ -123,46 +143,71 @@ export class ApiClient {
         },
       });
 
-      console.log('Response status:', response.status);
-      console.log('Response headers:', response.headers);
+      const serializedHeaders = serializeHeaders(response.headers);
+      console.log("Response status:", response.status);
+      console.log("Response headers:", serializedHeaders);
 
-      const data = await response.json();
-      console.log('Response data:', data);
+      const contentType = serializedHeaders["content-type"] || "";
+      let parsedBody: any = null;
 
-      if (!response.ok) {
-        throw new Error(data.message || `HTTP ${response.status}: Network request failed`);
+      try {
+        if (contentType.includes("application/json")) {
+          parsedBody = await response.json();
+        } else {
+          parsedBody = await response.text();
+        }
+      } catch (parseError) {
+        console.warn("Failed to parse response body:", parseError);
       }
 
-      return data;
+      console.log("Response data:", parsedBody);
+
+      if (!response.ok) {
+        throw createApiError(
+          response.status,
+          parsedBody,
+          `HTTP ${response.status}: Network request failed`
+        );
+      }
+
+      if (contentType.includes("application/json") && typeof parsedBody === "object") {
+        return parsedBody;
+      }
+
+      return {
+        success: true,
+        message: "Request successful",
+        data: parsedBody as T,
+      };
     } catch (error) {
-      console.error('API Request Error:', error);
-      console.error('Request URL:', `${this.baseURL}${endpoint}`);
-      console.error('Request options:', options);
+      console.error("API Request Error:", error);
+      console.error("Request URL:", `${this.baseURL}${endpoint}`);
+      console.error("Request options:", options);
       throw error;
     }
   }
 
   async get<T>(endpoint: string, params?: Record<string, any>): Promise<ApiResponse<T>> {
-    return this.request<T>(endpoint, { method: 'GET', params });
+    return this.request<T>(endpoint, { method: "GET", params });
   }
 
   async post<T>(endpoint: string, body?: any): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify(body),
     });
   }
 
   async patch<T>(endpoint: string, body?: any): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, {
-      method: 'PATCH',
+      method: "PATCH",
       body: JSON.stringify(body),
     });
   }
 
   async put<T>(endpoint: string, body?: any): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, {
-      method: 'PUT',
+      method: "PUT",
       body: JSON.stringify(body),
     });
   }

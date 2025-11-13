@@ -8,6 +8,13 @@ export interface Location {
   address?: string;
 }
 
+export interface MapPolyline {
+  id: string;
+  path: Location[];
+  color?: string;
+  weight?: number;
+}
+
 export interface MapViewProps {
   center?: Location;
   markers?: Array<{
@@ -17,6 +24,7 @@ export interface MapViewProps {
     color?: string;
     icon?: string;
   }>;
+  polylines?: MapPolyline[];
   onLocationSelect?: (location: Location) => void;
   onMarkerPress?: (markerId: string) => void;
   showMyLocation?: boolean;
@@ -37,6 +45,7 @@ const MapView = forwardRef<MapViewRef, MapViewProps>(
     {
       center = { latitude: 13.92077, longitude: 122.09891 }, // Jollibee Gumaca, Quezon default
       markers = [],
+      polylines = [],
       onLocationSelect,
       onMarkerPress,
       showMyLocation = true,
@@ -80,6 +89,18 @@ const MapView = forwardRef<MapViewRef, MapViewProps>(
         });
       },
     }));
+
+    // Update polylines when they change
+    React.useEffect(() => {
+      if (webViewRef.current) {
+        webViewRef.current?.postMessage(
+          JSON.stringify({
+            type: "setPolylines",
+            payload: polylines,
+          })
+        );
+      }
+    }, [polylines]);
 
     const handleMessage = (event: any) => {
       try {
@@ -191,10 +212,26 @@ const MapView = forwardRef<MapViewRef, MapViewProps>(
             initialMarkers.forEach(marker => {
                 addMarkerToMap(marker);
             });
+
+            const initialPolylines = ${JSON.stringify(polylines)};
+            initialPolylines.forEach(polyline => {
+                addPolylineToMap(polyline);
+            });
         }
 
         function addMarkerToMap(marker) {
-            const leafletMarker = L.marker([marker.location.latitude, marker.location.longitude])
+            let markerOptions = {};
+            if (marker.icon) {
+                markerOptions.icon = L.icon({
+                    iconUrl: marker.icon,
+                    iconSize: [36, 36],
+                    iconAnchor: [18, 32],
+                    popupAnchor: [0, -24],
+                    className: 'custom-marker-icon'
+                });
+            }
+
+            const leafletMarker = L.marker([marker.location.latitude, marker.location.longitude], markerOptions)
                 .addTo(map);
             
             if (marker.title) {
@@ -209,6 +246,22 @@ const MapView = forwardRef<MapViewRef, MapViewProps>(
             });
             
             markers[marker.id] = leafletMarker;
+        }
+
+        function addPolylineToMap(polyline) {
+            if (!Array.isArray(polyline.path) || polyline.path.length < 2) {
+                return;
+            }
+
+            const latLngs = polyline.path.map(point => [point.latitude, point.longitude]);
+            const leafletPolyline = L.polyline(latLngs, {
+                color: polyline.color || '#22c55e',
+                weight: polyline.weight || 6,
+                opacity: 0.8,
+                lineJoin: 'round'
+            }).addTo(map);
+
+            markers[polyline.id] = leafletPolyline;
         }
 
         // Message handler from React Native
@@ -226,6 +279,24 @@ const MapView = forwardRef<MapViewRef, MapViewProps>(
                     if (markers[message.payload.id]) {
                         map.removeLayer(markers[message.payload.id]);
                         delete markers[message.payload.id];
+                    }
+                    break;
+                case 'setPolyline':
+                    addPolylineToMap(message.payload);
+                    break;
+                case 'setPolylines':
+                    // Remove all existing polylines
+                    Object.keys(markers).forEach(key => {
+                        if (markers[key] && markers[key]._latlngs) {
+                            map.removeLayer(markers[key]);
+                            delete markers[key];
+                        }
+                    });
+                    // Add new polylines
+                    if (Array.isArray(message.payload)) {
+                        message.payload.forEach(polyline => {
+                            addPolylineToMap(polyline);
+                        });
                     }
                     break;
             }

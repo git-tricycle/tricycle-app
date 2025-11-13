@@ -38,6 +38,8 @@ export default function StudentDashboard() {
         const response = await rideService.getRidesByPassenger(user.id, {
           page: 1,
           limit: 1, // Just get the most recent ride
+          fields:
+            "id,pickup,dropoff,fare,paymentMode,status,createdAt,driver.firstName,driver.lastName",
         });
 
         if (response.success && response.data) {

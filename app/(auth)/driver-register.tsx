@@ -1,31 +1,34 @@
-import FormInput from '@/src/components/ui/FormInput';
-import FormStep from '@/src/components/ui/FormStep';
-import { useAuth } from '@/src/contexts/AuthContext';
-import { DriverRegistrationData } from '@/src/types/auth';
-import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import React, { useState } from 'react';
-import { Alert, Text, TouchableOpacity, View } from 'react-native';
+import FormInput from "@/src/components/ui/FormInput";
+import FormStep from "@/src/components/ui/FormStep";
+import { useAuth } from "@/src/contexts/AuthContext";
+import { DriverRegistrationData } from "@/src/types/auth";
+import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
+import React, { useState } from "react";
+import { Alert, Text, TouchableOpacity, View } from "react-native";
 
-type RegistrationStep = 'personal' | 'account' | 'emergency';
+type RegistrationStep = "personal" | "account" | "vehicle" | "emergency";
 
 export default function DriverRegisterScreen() {
-  const [currentStep, setCurrentStep] = useState<RegistrationStep>('personal');
+  const [currentStep, setCurrentStep] = useState<RegistrationStep>("personal");
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<Partial<DriverRegistrationData>>({});
   const [errors, setErrors] = useState<Partial<Record<keyof DriverRegistrationData, string>>>({});
 
   const { register } = useAuth();
 
-  const steps: RegistrationStep[] = ['personal', 'account', 'emergency'];
+  const steps: RegistrationStep[] = ["personal", "account", "vehicle", "emergency"];
   const currentStepIndex = steps.indexOf(currentStep) + 1;
   const totalSteps = steps.length;
 
-  const updateFormData = (field: keyof DriverRegistrationData, value: string | number | boolean) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const updateFormData = (
+    field: keyof DriverRegistrationData,
+    value: string | number | boolean
+  ) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
     // Clear error when user starts typing
     if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: undefined }));
+      setErrors((prev) => ({ ...prev, [field]: undefined }));
     }
   };
 
@@ -33,26 +36,34 @@ export default function DriverRegisterScreen() {
     const newErrors: Partial<Record<keyof DriverRegistrationData, string>> = {};
 
     switch (step) {
-      case 'personal':
-        if (!formData.firstName?.trim()) newErrors.firstName = 'First name is required';
-        if (!formData.lastName?.trim()) newErrors.lastName = 'Last name is required';
-        if (!formData.email?.trim()) newErrors.email = 'Email is required';
-        else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'Invalid email format';
-        if (!formData.age || formData.age < 18) newErrors.age = 'Must be at least 18 years old';
-        if (!formData.address?.trim()) newErrors.address = 'Address is required';
-        if (!formData.contactNumber?.trim()) newErrors.contactNumber = 'Contact number is required';
+      case "personal":
+        if (!formData.firstName?.trim()) newErrors.firstName = "First name is required";
+        if (!formData.lastName?.trim()) newErrors.lastName = "Last name is required";
+        if (!formData.email?.trim()) newErrors.email = "Email is required";
+        else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = "Invalid email format";
+        if (!formData.age || formData.age < 18) newErrors.age = "Must be at least 18 years old";
+        if (!formData.address?.trim()) newErrors.address = "Address is required";
+        if (!formData.contactNumber?.trim()) newErrors.contactNumber = "Contact number is required";
         break;
-      case 'account':
-        if (!formData.username?.trim()) newErrors.username = 'Username is required';
-        if (!formData.password?.trim()) newErrors.password = 'Password is required';
-        else if (formData.password.length < 8) newErrors.password = 'Password must be at least 8 characters';
-        if (!formData.confirmPassword?.trim()) newErrors.confirmPassword = 'Please confirm your password';
-        else if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = 'Passwords do not match';
+      case "account":
+        if (!formData.username?.trim()) newErrors.username = "Username is required";
+        if (!formData.password?.trim()) newErrors.password = "Password is required";
+        else if (formData.password.length < 8)
+          newErrors.password = "Password must be at least 8 characters";
+        if (!formData.confirmPassword?.trim())
+          newErrors.confirmPassword = "Please confirm your password";
+        else if (formData.password !== formData.confirmPassword)
+          newErrors.confirmPassword = "Passwords do not match";
         break;
-      case 'emergency':
+      case "vehicle":
+        if (!formData.plateNumber?.trim()) newErrors.plateNumber = "Plate number is required";
+        if (!formData.bodyNumber?.trim()) newErrors.bodyNumber = "Body number is required";
+        break;
+      case "emergency":
         // Emergency contact and terms are optional/handled separately
-        if (!formData.acceptTerms) newErrors.acceptTerms = 'You must accept the terms and conditions';
-        if (!formData.acceptPrivacy) newErrors.acceptPrivacy = 'You must accept the privacy policy';
+        if (!formData.acceptTerms)
+          newErrors.acceptTerms = "You must accept the terms and conditions";
+        if (!formData.acceptPrivacy) newErrors.acceptPrivacy = "You must accept the privacy policy";
         break;
     }
 
@@ -83,10 +94,10 @@ export default function DriverRegisterScreen() {
 
     try {
       setIsLoading(true);
-      await register(formData as DriverRegistrationData, 'driver');
-      router.replace('/(driver)/dashboard');
+      await register(formData as DriverRegistrationData, "driver");
+      router.replace("/(driver)/dashboard");
     } catch (error: any) {
-      Alert.alert('Registration Failed', error.message || 'Please try again');
+      Alert.alert("Registration Failed", error.message || "Please try again");
     } finally {
       setIsLoading(false);
     }
@@ -96,36 +107,36 @@ export default function DriverRegisterScreen() {
     <View>
       <FormInput
         label="First Name"
-        value={formData.firstName || ''}
-        onChangeText={(value) => updateFormData('firstName', value)}
+        value={formData.firstName || ""}
+        onChangeText={(value) => updateFormData("firstName", value)}
         placeholder="Enter your first name"
         error={errors.firstName}
         required
         leftIcon="person"
       />
-      
+
       <FormInput
         label="Last Name"
-        value={formData.lastName || ''}
-        onChangeText={(value) => updateFormData('lastName', value)}
+        value={formData.lastName || ""}
+        onChangeText={(value) => updateFormData("lastName", value)}
         placeholder="Enter your last name"
         error={errors.lastName}
         required
         leftIcon="person"
       />
-      
+
       <FormInput
         label="Middle Name"
-        value={formData.middleName || ''}
-        onChangeText={(value) => updateFormData('middleName', value)}
+        value={formData.middleName || ""}
+        onChangeText={(value) => updateFormData("middleName", value)}
         placeholder="Enter your middle name (optional)"
         leftIcon="person"
       />
-      
+
       <FormInput
         label="Email Address"
-        value={formData.email || ''}
-        onChangeText={(value) => updateFormData('email', value)}
+        value={formData.email || ""}
+        onChangeText={(value) => updateFormData("email", value)}
         placeholder="Enter your email address"
         error={errors.email}
         required
@@ -133,33 +144,33 @@ export default function DriverRegisterScreen() {
         keyboardType="email-address"
         autoCapitalize="none"
       />
-      
+
       <FormInput
         label="Age"
-        value={formData.age?.toString() || ''}
-        onChangeText={(value) => updateFormData('age', parseInt(value) || 0)}
+        value={formData.age?.toString() || ""}
+        onChangeText={(value) => updateFormData("age", parseInt(value) || 0)}
         placeholder="Enter your age"
         error={errors.age}
         required
         leftIcon="calendar"
         keyboardType="numeric"
       />
-      
+
       <FormInput
         label="Address"
-        value={formData.address || ''}
-        onChangeText={(value) => updateFormData('address', value)}
+        value={formData.address || ""}
+        onChangeText={(value) => updateFormData("address", value)}
         placeholder="Enter your complete address"
         error={errors.address}
         required
         leftIcon="home"
         multiline
       />
-      
+
       <FormInput
         label="Contact Number"
-        value={formData.contactNumber || ''}
-        onChangeText={(value) => updateFormData('contactNumber', value)}
+        value={formData.contactNumber || ""}
+        onChangeText={(value) => updateFormData("contactNumber", value)}
         placeholder="Enter your contact number"
         error={errors.contactNumber}
         required
@@ -173,30 +184,30 @@ export default function DriverRegisterScreen() {
     <View>
       <FormInput
         label="Username"
-        value={formData.username || ''}
-        onChangeText={(value) => updateFormData('username', value)}
+        value={formData.username || ""}
+        onChangeText={(value) => updateFormData("username", value)}
         placeholder="Choose a username"
         error={errors.username}
         required
         leftIcon="at"
         autoCapitalize="none"
       />
-      
+
       <FormInput
         label="Password"
-        value={formData.password || ''}
-        onChangeText={(value) => updateFormData('password', value)}
+        value={formData.password || ""}
+        onChangeText={(value) => updateFormData("password", value)}
         placeholder="Create a strong password"
         error={errors.password}
         required
         isPassword
         leftIcon="lock-closed"
       />
-      
+
       <FormInput
         label="Confirm Password"
-        value={formData.confirmPassword || ''}
-        onChangeText={(value) => updateFormData('confirmPassword', value)}
+        value={formData.confirmPassword || ""}
+        onChangeText={(value) => updateFormData("confirmPassword", value)}
         placeholder="Confirm your password"
         error={errors.confirmPassword}
         required
@@ -206,22 +217,75 @@ export default function DriverRegisterScreen() {
     </View>
   );
 
+  const renderVehicleInfo = () => (
+    <View>
+      <FormInput
+        label="Plate Number"
+        value={formData.plateNumber || ""}
+        onChangeText={(value) => updateFormData("plateNumber", value)}
+        placeholder="Enter your tricycle's plate number"
+        error={errors.plateNumber}
+        required
+        leftIcon="car"
+        autoCapitalize="characters"
+      />
+
+      <FormInput
+        label="Body Number"
+        value={formData.bodyNumber || ""}
+        onChangeText={(value) => updateFormData("bodyNumber", value)}
+        placeholder="Enter your tricycle's body number"
+        error={errors.bodyNumber}
+        required
+        leftIcon="receipt"
+        autoCapitalize="characters"
+      />
+
+      <FormInput
+        label="Vehicle Photo (Optional)"
+        value={formData.vehiclePhoto || ""}
+        onChangeText={(value) => updateFormData("vehiclePhoto", value)}
+        placeholder="Vehicle photo URL (optional)"
+        leftIcon="camera"
+      />
+
+      <FormInput
+        label="OR/CR Document (Optional)"
+        value={formData.orCrPhoto || ""}
+        onChangeText={(value) => updateFormData("orCrPhoto", value)}
+        placeholder="OR/CR document URL (optional)"
+        leftIcon="document"
+      />
+
+      <View className="mt-6 p-4 bg-blue-50 rounded-xl">
+        <View className="flex-row items-center mb-2">
+          <Ionicons name="information-circle" size={20} color="#3b82f6" />
+          <Text className="text-blue-700 font-semibold ml-2">Vehicle Information</Text>
+        </View>
+        <Text className="text-blue-600 text-sm leading-5">
+          Please provide accurate vehicle information. This will be used for ride identification and
+          verification purposes.
+        </Text>
+      </View>
+    </View>
+  );
+
   const renderEmergencyContact = () => (
     <View>
       <Text className="text-lg font-semibold text-gray-800 mb-4">Optional Information</Text>
-      
+
       <FormInput
         label="License Photo (Optional)"
-        value={formData.licensePhoto || ''}
-        onChangeText={(value) => updateFormData('licensePhoto', value)}
+        value={formData.licensePhoto || ""}
+        onChangeText={(value) => updateFormData("licensePhoto", value)}
         placeholder="License photo URL (optional)"
         leftIcon="card"
       />
-      
+
       <FormInput
         label="Valid ID Photo (Optional)"
-        value={formData.validIdPhoto || ''}
-        onChangeText={(value) => updateFormData('validIdPhoto', value)}
+        value={formData.validIdPhoto || ""}
+        onChangeText={(value) => updateFormData("validIdPhoto", value)}
         placeholder="Valid ID photo URL (optional)"
         leftIcon="id-card"
       />
@@ -229,15 +293,15 @@ export default function DriverRegisterScreen() {
       {/* Terms and Conditions */}
       <View className="mt-6">
         <TouchableOpacity
-          onPress={() => updateFormData('acceptTerms', !formData.acceptTerms)}
+          onPress={() => updateFormData("acceptTerms", !formData.acceptTerms)}
           className="flex-row items-start mb-4"
         >
-            <View className={`w-5 h-5 rounded border-2 mr-3 mt-0.5 items-center justify-center ${
-              formData.acceptTerms ? 'bg-black border-black' : 'border-gray-300'
-            }`}>
-            {formData.acceptTerms && (
-              <Ionicons name="checkmark" size={14} color="white" />
-            )}
+          <View
+            className={`w-5 h-5 rounded border-2 mr-3 mt-0.5 items-center justify-center ${
+              formData.acceptTerms ? "bg-black border-black" : "border-gray-300"
+            }`}
+          >
+            {formData.acceptTerms && <Ionicons name="checkmark" size={14} color="white" />}
           </View>
           <Text className="text-black flex-1">
             I accept the <Text className="text-black font-semibold">Terms and Conditions</Text>
@@ -248,15 +312,15 @@ export default function DriverRegisterScreen() {
         )}
 
         <TouchableOpacity
-          onPress={() => updateFormData('acceptPrivacy', !formData.acceptPrivacy)}
+          onPress={() => updateFormData("acceptPrivacy", !formData.acceptPrivacy)}
           className="flex-row items-start"
         >
-            <View className={`w-5 h-5 rounded border-2 mr-3 mt-0.5 items-center justify-center ${
-              formData.acceptPrivacy ? 'bg-black border-black' : 'border-gray-300'
-            }`}>
-            {formData.acceptPrivacy && (
-              <Ionicons name="checkmark" size={14} color="white" />
-            )}
+          <View
+            className={`w-5 h-5 rounded border-2 mr-3 mt-0.5 items-center justify-center ${
+              formData.acceptPrivacy ? "bg-black border-black" : "border-gray-300"
+            }`}
+          >
+            {formData.acceptPrivacy && <Ionicons name="checkmark" size={14} color="white" />}
           </View>
           <Text className="text-black flex-1">
             I accept the <Text className="text-black font-semibold">Privacy Policy</Text>
@@ -273,7 +337,8 @@ export default function DriverRegisterScreen() {
           <Text className="text-black font-semibold ml-2">Almost Done!</Text>
         </View>
         <Text className="text-gray-700 text-sm leading-5">
-          You&apos;re about to complete your driver registration. After submission, you can start using the app immediately.
+          You&apos;re about to complete your driver registration. After submission, you can start
+          using the app immediately.
         </Text>
       </View>
     </View>
@@ -281,32 +346,50 @@ export default function DriverRegisterScreen() {
 
   const getStepContent = () => {
     switch (currentStep) {
-      case 'personal': return renderPersonalInfo();
-      case 'account': return renderAccountInfo();
-      case 'emergency': return renderEmergencyContact();
-      default: return null;
+      case "personal":
+        return renderPersonalInfo();
+      case "account":
+        return renderAccountInfo();
+      case "vehicle":
+        return renderVehicleInfo();
+      case "emergency":
+        return renderEmergencyContact();
+      default:
+        return null;
     }
   };
 
   const getStepTitle = () => {
     switch (currentStep) {
-      case 'personal': return 'Personal Information';
-      case 'account': return 'Account Information';
-      case 'emergency': return 'Final Details';
-      default: return '';
+      case "personal":
+        return "Personal Information";
+      case "account":
+        return "Account Information";
+      case "vehicle":
+        return "Vehicle Information";
+      case "emergency":
+        return "Final Details";
+      default:
+        return "";
     }
   };
 
   const getStepSubtitle = () => {
     switch (currentStep) {
-      case 'personal': return 'Tell us about yourself';
-      case 'account': return 'Create your account credentials';
-      case 'emergency': return 'Optional documents and agreements';
-      default: return '';
+      case "personal":
+        return "Tell us about yourself";
+      case "account":
+        return "Create your account credentials";
+      case "vehicle":
+        return "Register your tricycle";
+      case "emergency":
+        return "Optional documents and agreements";
+      default:
+        return "";
     }
   };
 
-  const isLastStep = currentStep === 'emergency';
+  const isLastStep = currentStep === "emergency";
 
   return (
     <FormStep
@@ -316,7 +399,7 @@ export default function DriverRegisterScreen() {
       totalSteps={totalSteps}
       onBack={handleBack}
       onNext={isLastStep ? handleSubmit : handleNext}
-      nextButtonText={isLastStep ? 'Complete Registration' : 'Next'}
+      nextButtonText={isLastStep ? "Register" : "Next"}
       isLoading={isLoading}
     >
       {getStepContent()}

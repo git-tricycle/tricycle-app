@@ -1,4 +1,4 @@
-import { apiClient, ApiResponse, SearchParams } from './api.client';
+import { apiClient, ApiResponse, SearchParams } from "./api.client";
 
 // User Types matching API schema
 export interface User {
@@ -7,18 +7,30 @@ export interface User {
   lastName: string;
   middleName?: string;
   email: string;
-  role: 'driver' | 'passenger' | 'admin';
-  status: 'active' | 'inactive' | 'banned';
+  role: "driver" | "passenger" | "admin";
+  status: "active" | "inactive" | "banned";
   avatar?: string;
   metadata?: {
     address?: string;
     phone?: string;
     age?: number;
-    gender?: 'male' | 'female' | 'other';
+    gender?: "male" | "female" | "other";
   };
   isDeleted: boolean;
   createdAt: string;
   updatedAt: string;
+  driverProfile?: {
+    id: string;
+    userId: string;
+    username: string;
+    address: string;
+    age: number;
+    contactNumber: string;
+    licensePhoto?: string;
+    validIdPhoto?: string;
+    isVerified: boolean;
+    isDeleted: boolean;
+  };
 }
 
 export interface CreateUserRequest {
@@ -27,13 +39,13 @@ export interface CreateUserRequest {
   middleName?: string;
   email: string;
   password: string;
-  role: 'driver' | 'passenger' | 'admin';
-  status?: 'active' | 'inactive' | 'banned';
+  role: "driver" | "passenger" | "admin";
+  status?: "active" | "inactive" | "banned";
   metadata?: {
     address?: string;
     phone?: string;
     age?: number;
-    gender?: 'male' | 'female' | 'other';
+    gender?: "male" | "female" | "other";
   };
 }
 
@@ -42,19 +54,19 @@ export interface UpdateUserRequest {
   lastName?: string;
   middleName?: string;
   email?: string;
-  status?: 'active' | 'inactive' | 'banned';
+  status?: "active" | "inactive" | "banned";
   avatar?: string;
   metadata?: {
     address?: string;
     phone?: string;
     age?: number;
-    gender?: 'male' | 'female' | 'other';
+    gender?: "male" | "female" | "other";
   };
 }
 
 export interface UserFilters extends SearchParams {
-  role?: 'driver' | 'passenger' | 'admin';
-  status?: 'active' | 'inactive' | 'banned';
+  role?: "driver" | "passenger" | "admin";
+  status?: "active" | "inactive" | "banned";
   search?: string;
 }
 
@@ -63,21 +75,22 @@ class UserService {
    * Get all users (Admin only)
    */
   async getUsers(filters?: UserFilters): Promise<ApiResponse<User[]>> {
-    return apiClient.get<User[]>('/user', filters);
+    return apiClient.get<User[]>("/user", filters);
   }
 
   /**
    * Get user by ID
    */
-  async getUserById(id: string): Promise<ApiResponse<User>> {
-    return apiClient.get<User>(`/user/${id}`);
+  async getUserById(id: string, fields?: string): Promise<ApiResponse<User>> {
+    const params = fields ? { fields } : undefined;
+    return apiClient.get<User>(`/user/${id}`, params);
   }
 
   /**
    * Create user (Admin only)
    */
   async createUser(userData: CreateUserRequest): Promise<ApiResponse<User>> {
-    return apiClient.post<User>('/user/admin', userData);
+    return apiClient.post<User>("/user/admin", userData);
   }
 
   /**

@@ -71,6 +71,7 @@ export interface RideFilters extends SearchParams {
   paymentMode?: string;
   dateFrom?: string;
   dateTo?: string;
+  fields?: string;
 }
 
 export interface AvailableDriver {
@@ -128,8 +129,8 @@ class RideService {
   /**
    * Accept a ride (driver)
    */
-  async acceptRide(rideId: string): Promise<ApiResponse<Ride>> {
-    return apiClient.patch<Ride>(`/ride/${rideId}/accept`);
+  async acceptRide(rideId: string, driverId?: string): Promise<ApiResponse<Ride>> {
+    return apiClient.patch<Ride>(`/ride/${rideId}/accept`, { driverId });
   }
 
   /**

@@ -76,7 +76,7 @@ export default function LocationPicker({
     );
   };
 
-  // Location search with comprehensive Gumaca locations database
+  // Location search using Nominatim (OpenStreetMap) API - no key required
   const searchLocations = async (query: string) => {
     if (query.length < 2) {
       setSuggestions([]);
@@ -86,244 +86,85 @@ export default function LocationPicker({
     setIsLoading(true);
 
     try {
-      // Comprehensive Gumaca locations database
-      const gumacaLocations: LocationSuggestion[] = [
-        // Commercial & Dining
-        {
-          id: "jollibee-gumaca",
-          name: "Jollibee Gumaca",
-          address: "JP Rizal cor Bonifacio St, Gumaca, Quezon",
-          location: { latitude: 13.92077, longitude: 122.09891 },
-        },
-        {
-          id: "mcdo-gumaca",
-          name: "McDonald's Gumaca",
-          address: "National Highway, Gumaca, Quezon",
-          location: { latitude: 13.9205, longitude: 122.0985 },
-        },
-        {
-          id: "sm-gumaca",
-          name: "SM Save More Gumaca",
-          address: "National Highway, Gumaca, Quezon",
-          location: { latitude: 13.92, longitude: 122.098 },
-        },
-        {
-          id: "puregold-gumaca",
-          name: "Puregold Gumaca",
-          address: "Poblacion, Gumaca, Quezon",
-          location: { latitude: 13.9195, longitude: 122.0975 },
-        },
-        {
-          id: "7eleven-gumaca",
-          name: "7-Eleven Gumaca",
-          address: "National Highway, Gumaca, Quezon",
-          location: { latitude: 13.921, longitude: 122.099 },
-        },
+      // Use Nominatim (OpenStreetMap) for geocoding - free, no API key needed
+      // IMPORTANT: Must include User-Agent header (required by Nominatim)
+      const headers = {
+        "User-Agent": "TricycleApp/1.0 (Gumaca Ride Booking)",
+      };
 
-        // Government & Institutions
-        {
-          id: "municipal-hall",
-          name: "Gumaca Municipal Hall",
-          address: "Municipal Hall, Poblacion, Gumaca, Quezon",
-          location: { latitude: 13.92084, longitude: 122.09865 },
-        },
-        {
-          id: "police-station",
-          name: "Gumaca Police Station",
-          address: "Police Station, Poblacion, Gumaca, Quezon",
-          location: { latitude: 13.9208, longitude: 122.0988 },
-        },
-        {
-          id: "fire-station",
-          name: "Gumaca Fire Station",
-          address: "Fire Station, Poblacion, Gumaca, Quezon",
-          location: { latitude: 13.9206, longitude: 122.0987 },
-        },
-        {
-          id: "rhu-gumaca",
-          name: "Rural Health Unit Gumaca",
-          address: "RHU, Poblacion, Gumaca, Quezon",
-          location: { latitude: 13.9204, longitude: 122.0986 },
-        },
+      // Searching specifically in Gumaca, Quezon area
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?` +
+          `q=${encodeURIComponent(query)}, Gumaca, Quezon, Philippines&` +
+          `format=json&` +
+          `limit=8&` +
+          `viewbox=122.05,13.95,122.65,13.8&` + // Gumaca bounding box
+          `bounded=1`,
+        { headers }
+      );
 
-        // Schools
-        {
-          id: "gumaca-elementary",
-          name: "Gumaca Central Elementary School",
-          address: "Central Elementary School, Gumaca, Quezon",
-          location: { latitude: 13.9198, longitude: 122.0982 },
-        },
-        {
-          id: "gumaca-high",
-          name: "Gumaca National High School",
-          address: "National High School, Gumaca, Quezon",
-          location: { latitude: 13.9196, longitude: 122.0984 },
-        },
-        {
-          id: "quezon-college",
-          name: "Quezon College of Technology",
-          address: "Quezon College, Gumaca, Quezon",
-          location: { latitude: 13.9192, longitude: 122.0978 },
-        },
+      if (!response.ok) {
+        throw new Error(`Nominatim API error: ${response.status}`);
+      }
 
-        // Places of Worship
-        {
-          id: "st-diego-church",
-          name: "St. Diego de Alcala Church",
-          address: "Catholic Church, Poblacion, Gumaca, Quezon",
-          location: { latitude: 13.9202, longitude: 122.0983 },
-        },
-        {
-          id: "iglesia-ni-cristo",
-          name: "Iglesia ni Cristo Gumaca",
-          address: "INC Chapel, Gumaca, Quezon",
-          location: { latitude: 13.9194, longitude: 122.0979 },
-        },
+      const data = await response.json();
 
-        // Markets & Shopping
-        {
-          id: "public-market",
-          name: "Gumaca Public Market",
-          address: "Public Market, Poblacion, Gumaca, Quezon",
-          location: { latitude: 13.92, longitude: 122.0981 },
-        },
-        {
-          id: "sunday-market",
-          name: "Gumaca Sunday Market",
-          address: "Sunday Market, Poblacion, Gumaca, Quezon",
-          location: { latitude: 13.9199, longitude: 122.098 },
-        },
+      if (Array.isArray(data) && data.length > 0) {
+        const suggestions: LocationSuggestion[] = data.map((place, index) => ({
+          id: `${place.place_id || index}`,
+          name: place.name || place.display_name?.split(",")[0] || "Unknown Place",
+          address: place.display_name || "No address available",
+          location: {
+            latitude: parseFloat(place.lat),
+            longitude: parseFloat(place.lon),
+          },
+        }));
 
-        // Transportation Hubs
-        {
-          id: "bus-terminal",
-          name: "Gumaca Bus Terminal",
-          address: "Bus Terminal, National Highway, Gumaca, Quezon",
-          location: { latitude: 13.9215, longitude: 122.0995 },
-        },
-        {
-          id: "jeepney-terminal",
-          name: "Jeepney Terminal",
-          address: "Jeepney Terminal, Poblacion, Gumaca, Quezon",
-          location: { latitude: 13.9201, longitude: 122.0985 },
-        },
-
-        // Banks & Financial
-        {
-          id: "bdo-gumaca",
-          name: "BDO Gumaca",
-          address: "Banco de Oro, National Highway, Gumaca, Quezon",
-          location: { latitude: 13.9207, longitude: 122.0989 },
-        },
-        {
-          id: "pnb-gumaca",
-          name: "PNB Gumaca",
-          address: "Philippine National Bank, Gumaca, Quezon",
-          location: { latitude: 13.9203, longitude: 122.0987 },
-        },
-        {
-          id: "landbank-gumaca",
-          name: "Landbank Gumaca",
-          address: "Land Bank of the Philippines, Gumaca, Quezon",
-          location: { latitude: 13.9205, longitude: 122.0988 },
-        },
-
-        // Medical & Health
-        {
-          id: "gumaca-hospital",
-          name: "Gumaca District Hospital",
-          address: "District Hospital, Gumaca, Quezon",
-          location: { latitude: 13.919, longitude: 122.0976 },
-        },
-        {
-          id: "mercury-drug",
-          name: "Mercury Drug Gumaca",
-          address: "Mercury Drug Store, National Highway, Gumaca, Quezon",
-          location: { latitude: 13.9209, longitude: 122.0991 },
-        },
-
-        // Gas Stations
-        {
-          id: "petron-gumaca",
-          name: "Petron Gumaca",
-          address: "Petron Gas Station, National Highway, Gumaca, Quezon",
-          location: { latitude: 13.9212, longitude: 122.0992 },
-        },
-        {
-          id: "shell-gumaca",
-          name: "Shell Gumaca",
-          address: "Shell Gas Station, National Highway, Gumaca, Quezon",
-          location: { latitude: 13.9214, longitude: 122.0994 },
-        },
-
-        // Recreational
-        {
-          id: "gumaca-plaza",
-          name: "Gumaca Town Plaza",
-          address: "Town Plaza, Poblacion, Gumaca, Quezon",
-          location: { latitude: 13.9203, longitude: 122.0984 },
-        },
-        {
-          id: "basketball-court",
-          name: "Gumaca Basketball Court",
-          address: "Basketball Court, Poblacion, Gumaca, Quezon",
-          location: { latitude: 13.9197, longitude: 122.0981 },
-        },
-      ];
-
-      // Filter locations based on search query
-      const filteredSuggestions = gumacaLocations
-        .filter((location) => {
-          const searchTerm = query.toLowerCase();
-          return (
-            location.name.toLowerCase().includes(searchTerm) ||
-            location.address.toLowerCase().includes(searchTerm) ||
-            location.id.toLowerCase().includes(searchTerm)
-          );
-        })
-        .slice(0, 8); // Limit to 8 results for better UX
-
-      // Simulate network delay for better UX
-      await new Promise((resolve) => setTimeout(resolve, 300));
-
-      setSuggestions(filteredSuggestions);
-
-      // If no matches found, show popular locations as suggestions
-      if (filteredSuggestions.length === 0) {
-        const popularLocations = [
-          gumacaLocations[0], // Jollibee
-          gumacaLocations[1], // McDonald's
-          gumacaLocations[5], // Municipal Hall
-          gumacaLocations[14], // Public Market
-        ];
-        setSuggestions(popularLocations);
+        setSuggestions(suggestions.slice(0, 8));
+      } else {
+        // If no results from API, show message
+        setSuggestions([]);
       }
     } catch (error) {
-      console.error("Search error:", error);
+      console.error("Nominatim search error:", error);
 
-      // Fallback to essential locations if something goes wrong
-      const essentialLocations: LocationSuggestion[] = [
-        {
-          id: "jollibee-fallback",
-          name: "Jollibee Gumaca",
-          address: "JP Rizal cor Bonifacio St, Gumaca, Quezon",
-          location: { latitude: 13.92077, longitude: 122.09891 },
-        },
-        {
-          id: "municipal-hall-fallback",
-          name: "Gumaca Municipal Hall",
-          address: "Municipal Hall, Poblacion, Gumaca, Quezon",
-          location: { latitude: 13.92084, longitude: 122.09865 },
-        },
-        {
-          id: "public-market-fallback",
-          name: "Gumaca Public Market",
-          address: "Public Market, Poblacion, Gumaca, Quezon",
-          location: { latitude: 13.92, longitude: 122.0981 },
-        },
-      ];
+      // Fallback: try alternative search with just the query
+      try {
+        const headers = {
+          "User-Agent": "TricycleApp/1.0 (Gumaca Ride Booking)",
+        };
 
-      setSuggestions(essentialLocations);
+        const fallbackResponse = await fetch(
+          `https://nominatim.openstreetmap.org/search?` +
+            `q=${encodeURIComponent(query)}&` +
+            `format=json&` +
+            `limit=8`,
+          { headers }
+        );
+
+        if (fallbackResponse.ok) {
+          const fallbackData = await fallbackResponse.json();
+
+          if (Array.isArray(fallbackData) && fallbackData.length > 0) {
+            const suggestions: LocationSuggestion[] = fallbackData.map((place, index) => ({
+              id: `${place.place_id || index}`,
+              name: place.name || place.display_name?.split(",")[0] || "Unknown Place",
+              address: place.display_name || "No address available",
+              location: {
+                latitude: parseFloat(place.lat),
+                longitude: parseFloat(place.lon),
+              },
+            }));
+
+            setSuggestions(suggestions.slice(0, 8));
+          } else {
+            setSuggestions([]);
+          }
+        }
+      } catch (fallbackError) {
+        console.error("Fallback search error:", fallbackError);
+        setSuggestions([]);
+      }
     } finally {
       setIsLoading(false);
     }
