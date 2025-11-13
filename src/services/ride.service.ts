@@ -1,4 +1,4 @@
-import { apiClient, ApiResponse, SearchParams } from './api.client';
+import { apiClient, ApiResponse, SearchParams } from "./api.client";
 
 // Ride Types matching API schema
 export interface Ride {
@@ -10,7 +10,7 @@ export interface Ride {
   dropoff: string;
   fare: number;
   paymentMode: string;
-  status: 'pending' | 'accepted' | 'in_progress' | 'completed' | 'cancelled';
+  status: "pending" | "accepted" | "in_progress" | "completed" | "cancelled";
   eta?: number;
   createdAt: string;
   isDeleted: boolean;
@@ -36,7 +36,7 @@ export interface Ride {
   payment?: {
     id: string;
     amount: number;
-    type: 'cash' | 'gcash';
+    type: "cash" | "gcash";
     isPaid: boolean;
   };
   rating?: {
@@ -59,7 +59,7 @@ export interface UpdateRideRequest {
   dropoff?: string;
   fare?: number;
   paymentMode?: string;
-  status?: 'pending' | 'accepted' | 'in_progress' | 'completed' | 'cancelled';
+  status?: "pending" | "accepted" | "in_progress" | "completed" | "cancelled";
   eta?: number;
   driverId?: string;
 }
@@ -67,10 +67,27 @@ export interface UpdateRideRequest {
 export interface RideFilters extends SearchParams {
   passengerId?: string;
   driverId?: string;
-  status?: 'pending' | 'accepted' | 'in_progress' | 'completed' | 'cancelled';
+  status?: "pending" | "accepted" | "in_progress" | "completed" | "cancelled";
   paymentMode?: string;
   dateFrom?: string;
   dateTo?: string;
+  fields?: string;
+}
+
+export interface AvailableDriver {
+  id: string;
+  name: string;
+  email: string;
+  username?: string;
+  contactNumber?: string;
+  vehicleNumber: string;
+  location?: {
+    latitude: number;
+    longitude: number;
+    updatedAt: string;
+  };
+  rating: number;
+  estimatedArrival: number;
 }
 
 class RideService {
@@ -78,7 +95,7 @@ class RideService {
    * Get all rides
    */
   async getRides(filters?: RideFilters): Promise<ApiResponse<Ride[]>> {
-    return apiClient.get<Ride[]>('/ride', filters);
+    return apiClient.get<Ride[]>("/ride", filters);
   }
 
   /**
@@ -92,7 +109,7 @@ class RideService {
    * Create a new ride request
    */
   async createRide(rideData: CreateRideRequest): Promise<ApiResponse<Ride>> {
-    return apiClient.post<Ride>('/ride', rideData);
+    return apiClient.post<Ride>("/ride", rideData);
   }
 
   /**
@@ -112,8 +129,8 @@ class RideService {
   /**
    * Accept a ride (driver)
    */
-  async acceptRide(rideId: string): Promise<ApiResponse<Ride>> {
-    return apiClient.patch<Ride>(`/ride/${rideId}/accept`);
+  async acceptRide(rideId: string, driverId?: string): Promise<ApiResponse<Ride>> {
+    return apiClient.patch<Ride>(`/ride/${rideId}/accept`, { driverId });
   }
 
   /**
@@ -140,7 +157,10 @@ class RideService {
   /**
    * Get rides by passenger
    */
-  async getRidesByPassenger(passengerId: string, filters?: RideFilters): Promise<ApiResponse<Ride[]>> {
+  async getRidesByPassenger(
+    passengerId: string,
+    filters?: RideFilters
+  ): Promise<ApiResponse<Ride[]>> {
     return apiClient.get<Ride[]>(`/ride/passenger/${passengerId}`, filters);
   }
 
@@ -149,6 +169,17 @@ class RideService {
    */
   async getRidesByDriver(driverId: string, filters?: RideFilters): Promise<ApiResponse<Ride[]>> {
     return apiClient.get<Ride[]>(`/ride/driver/${driverId}`, filters);
+  }
+
+  /**
+   * Get available drivers near a location
+   */
+  async getAvailableDrivers(params?: {
+    latitude?: number;
+    longitude?: number;
+    limit?: number;
+  }): Promise<ApiResponse<AvailableDriver[]>> {
+    return apiClient.get<AvailableDriver[]>("/ride/available-drivers", params);
   }
 }
 

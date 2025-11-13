@@ -1,4 +1,4 @@
-export type UserRole = 'passenger' | 'driver' | 'admin';
+export type UserRole = "passenger" | "driver" | "admin";
 
 export interface AuthUser {
   id: string;
@@ -26,7 +26,7 @@ export interface StudentRegistrationData {
   email: string;
   password: string;
   confirmPassword: string; // UI only, not sent to API
-  
+
   // Student Profile Information
   studentId: string;
   dateOfBirth: string;
@@ -36,7 +36,7 @@ export interface StudentRegistrationData {
   emergencyContactName?: string;
   emergencyContactNumber?: string;
   studentIdPhoto?: string;
-  
+
   // UI/Validation only
   acceptTerms: boolean;
   acceptPrivacy: boolean;
@@ -50,7 +50,7 @@ export interface DriverRegistrationData {
   email: string;
   password: string;
   confirmPassword: string; // UI only, not sent to API
-  
+
   // Driver Profile Information
   username: string;
   address: string;
@@ -58,7 +58,13 @@ export interface DriverRegistrationData {
   contactNumber: string;
   licensePhoto?: string;
   validIdPhoto?: string;
-  
+
+  // Vehicle Information
+  plateNumber: string;
+  bodyNumber: string;
+  vehiclePhoto?: string;
+  orCrPhoto?: string;
+
   // UI/Validation only
   acceptTerms?: boolean;
   acceptPrivacy?: boolean;
@@ -73,7 +79,10 @@ export interface AuthState {
 
 export interface AuthContextType extends AuthState {
   login: (credentials: LoginCredentials) => Promise<void>;
-  register: (data: StudentRegistrationData | DriverRegistrationData, role: UserRole) => Promise<void>;
+  register: (
+    data: StudentRegistrationData | DriverRegistrationData,
+    role: UserRole
+  ) => Promise<void>;
   logout: () => Promise<void>;
   checkAuthStatus: () => Promise<void>;
 }

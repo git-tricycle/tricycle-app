@@ -1,4 +1,4 @@
-import { apiClient, ApiResponse, SearchParams } from './api.client';
+import { apiClient, ApiResponse, SearchParams } from "./api.client";
 
 // Rating Types matching API schema
 export interface Rating {
@@ -20,6 +20,7 @@ export interface Rating {
 
 export interface CreateRatingRequest {
   rideId: string;
+  driverId: string;
   rating: number;
   comment?: string;
 }
@@ -43,7 +44,7 @@ class RatingService {
    * Get all ratings
    */
   async getRatings(filters?: RatingFilters): Promise<ApiResponse<Rating[]>> {
-    return apiClient.get<Rating[]>('/rating', filters);
+    return apiClient.get<Rating[]>("/rating", filters);
   }
 
   /**
@@ -57,7 +58,7 @@ class RatingService {
    * Create rating
    */
   async createRating(ratingData: CreateRatingRequest): Promise<ApiResponse<Rating>> {
-    return apiClient.post<Rating>('/rating', ratingData);
+    return apiClient.post<Rating>("/rating", ratingData);
   }
 
   /**
@@ -84,28 +85,39 @@ class RatingService {
   /**
    * Get ratings by passenger
    */
-  async getRatingsByPassenger(passengerId: string, filters?: RatingFilters): Promise<ApiResponse<Rating[]>> {
+  async getRatingsByPassenger(
+    passengerId: string,
+    filters?: RatingFilters
+  ): Promise<ApiResponse<Rating[]>> {
     return apiClient.get<Rating[]>(`/rating/passenger/${passengerId}`, filters);
   }
 
   /**
    * Get ratings by driver
    */
-  async getRatingsByDriver(driverId: string, filters?: RatingFilters): Promise<ApiResponse<Rating[]>> {
+  async getRatingsByDriver(
+    driverId: string,
+    filters?: RatingFilters
+  ): Promise<ApiResponse<Rating[]>> {
     return apiClient.get<Rating[]>(`/rating/driver/${driverId}`, filters);
   }
 
   /**
    * Get driver average rating
    */
-  async getDriverAverageRating(driverId: string): Promise<ApiResponse<{ averageRating: number; totalRatings: number }>> {
+  async getDriverAverageRating(
+    driverId: string
+  ): Promise<ApiResponse<{ averageRating: number; totalRatings: number }>> {
     return apiClient.get(`/rating/driver/${driverId}/average`);
   }
 
   /**
    * Get passenger rating history
    */
-  async getPassengerRatingHistory(passengerId: string, filters?: RatingFilters): Promise<ApiResponse<Rating[]>> {
+  async getPassengerRatingHistory(
+    passengerId: string,
+    filters?: RatingFilters
+  ): Promise<ApiResponse<Rating[]>> {
     return apiClient.get<Rating[]>(`/rating/passenger/${passengerId}/history`, filters);
   }
 
@@ -113,7 +125,7 @@ class RatingService {
    * Get rating statistics
    */
   async getRatingStats(dateFrom?: string, dateTo?: string): Promise<ApiResponse<any>> {
-    return apiClient.get('/rating/stats', { dateFrom, dateTo });
+    return apiClient.get("/rating/stats", { dateFrom, dateTo });
   }
 }
 

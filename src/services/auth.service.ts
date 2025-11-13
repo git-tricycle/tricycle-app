@@ -1,10 +1,10 @@
-import { apiClient, ApiResponse } from './api.client';
+import { apiClient, ApiResponse } from "./api.client";
 
 // Auth Types matching API schema
 export interface LoginCredentials {
   email: string;
   password: string;
-  role: 'driver' | 'passenger' | 'admin';
+  role: "driver" | "passenger" | "admin";
 }
 
 export interface RegisterData {
@@ -13,16 +13,24 @@ export interface RegisterData {
   middleName?: string;
   email: string;
   password: string;
-  role?: 'driver' | 'passenger' | 'admin';
-  status?: 'active' | 'inactive' | 'banned';
+  role?: "driver" | "passenger" | "admin";
+  status?: "active" | "inactive" | "banned";
   metadata?: {
     address?: string;
     phone?: string;
     age?: number;
-    gender?: 'male' | 'female' | 'other';
+    gender?: "male" | "female" | "other";
   } | null;
   studentProfile?: StudentProfileData;
   driverProfile?: DriverProfileData;
+  vehicleData?: VehicleData;
+}
+
+export interface VehicleData {
+  plateNumber: string;
+  bodyNumber: string;
+  vehiclePhoto?: string;
+  orCrPhoto?: string;
 }
 
 export interface StudentProfileData {
@@ -51,8 +59,8 @@ export interface AuthUser {
   lastName: string;
   middleName?: string;
   email: string;
-  role: 'driver' | 'passenger' | 'admin';
-  status: 'active' | 'inactive' | 'banned';
+  role: "driver" | "passenger" | "admin";
+  status: "active" | "inactive" | "banned";
   createdAt: string;
 }
 
@@ -67,13 +75,13 @@ class AuthService {
    */
   async register(data: RegisterData): Promise<ApiResponse<AuthResponse>> {
     try {
-      const response = await apiClient.post<AuthResponse>('/auth/register', data);
-      
+      const response = await apiClient.post<AuthResponse>("/auth/register", data);
+
       if (response.success && response.data?.token) {
         // Store token for future requests
         await apiClient.setToken(response.data.token);
       }
-      
+
       return response;
     } catch (error) {
       throw error;
@@ -85,13 +93,13 @@ class AuthService {
    */
   async login(credentials: LoginCredentials): Promise<ApiResponse<AuthResponse>> {
     try {
-      const response = await apiClient.post<AuthResponse>('/auth/login', credentials);
-      
+      const response = await apiClient.post<AuthResponse>("/auth/login", credentials);
+
       if (response.success && response.data?.token) {
         // Store token for future requests
         await apiClient.setToken(response.data.token);
       }
-      
+
       return response;
     } catch (error) {
       throw error;
@@ -106,7 +114,7 @@ class AuthService {
       // Remove stored token
       await apiClient.removeToken();
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error("Logout error:", error);
     }
   }
 

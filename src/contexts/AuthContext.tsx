@@ -1,6 +1,13 @@
-import React, { createContext, ReactNode, useContext, useEffect, useReducer } from 'react';
-import { authService } from '../../services/auth.service';
-import { AuthContextType, AuthState, DriverRegistrationData, LoginCredentials, StudentRegistrationData, UserRole } from '../types/auth';
+import React, { createContext, ReactNode, useContext, useEffect, useReducer } from "react";
+import { authService } from "../services/auth.service";
+import {
+  AuthContextType,
+  AuthState,
+  DriverRegistrationData,
+  LoginCredentials,
+  StudentRegistrationData,
+  UserRole,
+} from "../types/auth";
 
 // Initial state
 const initialState: AuthState = {
@@ -12,17 +19,17 @@ const initialState: AuthState = {
 
 // Action types
 type AuthAction =
-  | { type: 'SET_LOADING'; payload: boolean }
-  | { type: 'SET_USER'; payload: { user: any; token: string } }
-  | { type: 'CLEAR_USER' }
-  | { type: 'SET_TOKEN'; payload: string };
+  | { type: "SET_LOADING"; payload: boolean }
+  | { type: "SET_USER"; payload: { user: any; token: string } }
+  | { type: "CLEAR_USER" }
+  | { type: "SET_TOKEN"; payload: string };
 
 // Reducer
 function authReducer(state: AuthState, action: AuthAction): AuthState {
   switch (action.type) {
-    case 'SET_LOADING':
+    case "SET_LOADING":
       return { ...state, isLoading: action.payload };
-    case 'SET_USER':
+    case "SET_USER":
       return {
         ...state,
         user: action.payload.user,
@@ -30,7 +37,7 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
         isAuthenticated: true,
         isLoading: false,
       };
-    case 'CLEAR_USER':
+    case "CLEAR_USER":
       return {
         ...state,
         user: null,
@@ -38,7 +45,7 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
         isAuthenticated: false,
         isLoading: false,
       };
-    case 'SET_TOKEN':
+    case "SET_TOKEN":
       return { ...state, token: action.payload };
     default:
       return state;
@@ -59,54 +66,57 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Check authentication status on app start
   const checkAuthStatus = async () => {
     try {
-      dispatch({ type: 'SET_LOADING', payload: true });
+      dispatch({ type: "SET_LOADING", payload: true });
       const isAuthenticated = await authService.isAuthenticated();
-      
+
       if (isAuthenticated) {
         const token = await authService.getToken();
         if (token) {
-          dispatch({ type: 'SET_TOKEN', payload: token });
+          dispatch({ type: "SET_TOKEN", payload: token });
           // You might want to fetch user data here
           // const userData = await authService.getCurrentUser();
           // dispatch({ type: 'SET_USER', payload: { user: userData, token } });
         }
       }
     } catch (error) {
-      console.error('Auth check failed:', error);
-      dispatch({ type: 'CLEAR_USER' });
+      console.error("Auth check failed:", error);
+      dispatch({ type: "CLEAR_USER" });
     } finally {
-      dispatch({ type: 'SET_LOADING', payload: false });
+      dispatch({ type: "SET_LOADING", payload: false });
     }
   };
 
   // Login function
   const login = async (credentials: LoginCredentials) => {
     try {
-      dispatch({ type: 'SET_LOADING', payload: true });
+      dispatch({ type: "SET_LOADING", payload: true });
       const response = await authService.login(credentials);
-      
+
       if (response.success && response.data) {
         dispatch({
-          type: 'SET_USER',
+          type: "SET_USER",
           payload: {
             user: response.data.user,
             token: response.data.token,
           },
         });
       } else {
-        throw new Error(response.message || 'Login failed');
+        throw new Error(response.message || "Login failed");
       }
     } catch (error) {
-      dispatch({ type: 'SET_LOADING', payload: false });
+      dispatch({ type: "SET_LOADING", payload: false });
       throw error;
     }
   };
 
   // Register function
-  const register = async (data: StudentRegistrationData | DriverRegistrationData, role: UserRole) => {
+  const register = async (
+    data: StudentRegistrationData | DriverRegistrationData,
+    role: UserRole
+  ) => {
     try {
-      dispatch({ type: 'SET_LOADING', payload: true });
-      
+      dispatch({ type: "SET_LOADING", payload: true });
+
       // Transform data to match API structure
       let registerData: any = {
         firstName: data.firstName,
@@ -118,7 +128,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       };
 
       // Add profile data based on role
-      if (role === 'passenger') {
+      if (role === "passenger") {
         const studentData = data as StudentRegistrationData;
         registerData.studentProfile = {
           studentId: studentData.studentId,
@@ -130,7 +140,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           emergencyContactNumber: studentData.emergencyContactNumber,
           studentIdPhoto: studentData.studentIdPhoto,
         };
-      } else if (role === 'driver') {
+      } else if (role === "driver") {
         const driverData = data as DriverRegistrationData;
         registerData.driverProfile = {
           username: driverData.username,
@@ -140,23 +150,33 @@ export function AuthProvider({ children }: AuthProviderProps) {
           licensePhoto: driverData.licensePhoto,
           validIdPhoto: driverData.validIdPhoto,
         };
+
+        // Add vehicle data if provided
+        if (driverData.plateNumber && driverData.bodyNumber) {
+          registerData.vehicleData = {
+            plateNumber: driverData.plateNumber,
+            bodyNumber: driverData.bodyNumber,
+            vehiclePhoto: driverData.vehiclePhoto,
+            orCrPhoto: driverData.orCrPhoto,
+          };
+        }
       }
 
       const response = await authService.register(registerData);
-      
+
       if (response.success && response.data) {
         dispatch({
-          type: 'SET_USER',
+          type: "SET_USER",
           payload: {
             user: response.data.user,
             token: response.data.token,
           },
         });
       } else {
-        throw new Error(response.message || 'Registration failed');
+        throw new Error(response.message || "Registration failed");
       }
     } catch (error) {
-      dispatch({ type: 'SET_LOADING', payload: false });
+      dispatch({ type: "SET_LOADING", payload: false });
       throw error;
     }
   };
@@ -165,11 +185,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const logout = async () => {
     try {
       await authService.logout();
-      dispatch({ type: 'CLEAR_USER' });
+      dispatch({ type: "CLEAR_USER" });
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error("Logout error:", error);
       // Still clear user data even if logout request fails
-      dispatch({ type: 'CLEAR_USER' });
+      dispatch({ type: "CLEAR_USER" });
     }
   };
 
@@ -193,7 +213,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 }
