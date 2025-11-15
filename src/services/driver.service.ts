@@ -113,6 +113,70 @@ class DriverService {
   async updateDriverLocation(location: DriverLocationUpdate): Promise<ApiResponse<any>> {
     return apiClient.patch<any>("/driver/location", location);
   }
+
+  /**
+   * Upload driver requirements (license and valid ID photos)
+   */
+  async uploadRequirements(
+    driverId: string,
+    files: {
+      licensePhoto?: File | { uri: string; name: string; type: string };
+      validIdPhoto?: File | { uri: string; name: string; type: string };
+    }
+  ): Promise<ApiResponse<any>> {
+    const formData = new FormData();
+
+    if (files.licensePhoto) {
+      if ("uri" in files.licensePhoto) {
+        // React Native format
+        formData.append("licensePhoto", {
+          uri: files.licensePhoto.uri,
+          name: files.licensePhoto.name,
+          type: files.licensePhoto.type,
+        } as any);
+      } else {
+        // Web File format
+        formData.append("licensePhoto", files.licensePhoto);
+      }
+    }
+
+    if (files.validIdPhoto) {
+      if ("uri" in files.validIdPhoto) {
+        // React Native format
+        formData.append("validIdPhoto", {
+          uri: files.validIdPhoto.uri,
+          name: files.validIdPhoto.name,
+          type: files.validIdPhoto.type,
+        } as any);
+      } else {
+        // Web File format
+        formData.append("validIdPhoto", files.validIdPhoto);
+      }
+    }
+
+    // Override content type for multipart form data
+    return apiClient.request<any>(`/driver/${driverId}/upload-requirements`, {
+      method: "POST",
+      body: formData,
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+  }
+
+  /**
+   * Delete driver requirements from Cloudinary
+   */
+  async deleteRequirements(
+    driverId: string,
+    documentType?: "license" | "validId" | "all"
+  ): Promise<ApiResponse<any>> {
+    const params = documentType ? { documentType } : undefined;
+    return apiClient.request<any>(`/driver/${driverId}/delete-requirements`, {
+      method: "DELETE",
+      params,
+    });
+  }
 }
 
 export const driverService = new DriverService();

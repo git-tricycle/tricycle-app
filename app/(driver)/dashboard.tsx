@@ -1,20 +1,19 @@
 import { useAuth } from "@/src/contexts/AuthContext";
+import { driverService, type Driver } from "@/src/services/driver.service";
+import { rideService, type Ride } from "@/src/services/ride.service";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
+  Alert,
+  RefreshControl,
   ScrollView,
   Switch,
   Text,
   TouchableOpacity,
   View,
-  ActivityIndicator,
-  RefreshControl,
-  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { rideService, type Ride } from "@/src/services/ride.service";
-import { driverService, type Driver } from "@/src/services/driver.service";
 
 interface DashboardStats {
   todayEarnings: number;
@@ -265,22 +264,13 @@ export default function DriverDashboard() {
                 {driverProfile?.isVerified ? "Account Verified" : "Account Pending Verification"}
               </Text>
             </View>
-            <TouchableOpacity
-              onPress={handleLogout}
-              className="w-10 h-10 bg-white/20 rounded-full items-center justify-center"
-            >
-              <Ionicons name="log-out" size={20} color="white" />
-            </TouchableOpacity>
           </View>
 
           {/* Availability Toggle */}
           <View className="bg-white/10 rounded-2xl p-4">
             <View className="flex-row items-center justify-between">
               <View className="flex-1">
-                <View className="flex-row items-center">
-                  <View
-                    className={`w-3 h-3 rounded-full mr-2 ${isAvailable ? "bg-green-400" : "bg-gray-400"}`}
-                  />
+                <View className="">
                   <Text className="text-white font-semibold text-lg">
                     {isAvailable ? "You're Online" : "You're Offline"}
                   </Text>
@@ -330,9 +320,8 @@ export default function DriverDashboard() {
         {/* Stats Cards */}
         <View className="px-6 -mt-6">
           <View className="bg-white rounded-2xl p-6 shadow-sm">
-            <View className="flex-row items-center justify-between mb-4">
+            <View className=" mb-4">
               <Text className="text-black text-lg font-semibold">Today&apos;s Summary</Text>
-              {isLoading && <ActivityIndicator size="small" color="#000" />}
             </View>
 
             <View className="flex-row justify-between">
@@ -347,22 +336,6 @@ export default function DriverDashboard() {
               <View className="items-center flex-1">
                 <Text className="text-2xl font-bold text-black">{stats.onlineHours}h</Text>
                 <Text className="text-gray-500 text-sm">Online</Text>
-              </View>
-            </View>
-
-            {/* Weekly Stats */}
-            <View className="mt-4 pt-4 border-t border-gray-100">
-              <View className="flex-row justify-between items-center">
-                <View>
-                  <Text className="text-gray-600 text-sm">This Week</Text>
-                  <Text className="text-black text-lg font-semibold">₱{stats.weeklyEarnings}</Text>
-                </View>
-                <TouchableOpacity
-                  onPress={() => router.push("/(driver)/earnings")}
-                  className="bg-black rounded-lg px-4 py-2"
-                >
-                  <Text className="text-white text-sm font-medium">View Details</Text>
-                </TouchableOpacity>
               </View>
             </View>
           </View>
@@ -395,7 +368,7 @@ export default function DriverDashboard() {
           <View className="bg-white rounded-2xl p-6 shadow-sm">
             <Text className="text-black text-lg font-semibold mb-4">Quick Actions</Text>
 
-            <View className="space-y-4">
+            <View className="space-y-4 gap-3">
               <TouchableOpacity
                 onPress={() => router.push("/(driver)/ride-requests")}
                 className="flex-row items-center p-4 bg-gray-100 rounded-xl"
@@ -465,7 +438,7 @@ export default function DriverDashboard() {
           <View className="bg-white rounded-2xl p-6 shadow-sm">
             <Text className="text-black text-lg font-semibold mb-4">Driver Status</Text>
 
-            <View className="space-y-3">
+            <View className="space-y-3 gap-3">
               <View className="flex-row items-center justify-between">
                 <View className="flex-row items-center">
                   <Ionicons

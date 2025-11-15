@@ -151,13 +151,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
           validIdPhoto: driverData.validIdPhoto,
         };
 
-        // Add vehicle data if provided
+        // Add vehicle data if provided (documents will be uploaded via profile screen)
         if (driverData.plateNumber && driverData.bodyNumber) {
           registerData.vehicleData = {
             plateNumber: driverData.plateNumber,
             bodyNumber: driverData.bodyNumber,
-            vehiclePhoto: driverData.vehiclePhoto,
-            orCrPhoto: driverData.orCrPhoto,
+            // Note: vehiclePhoto and orCrPhoto are uploaded separately via profile screen
           };
         }
       }
