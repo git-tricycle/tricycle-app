@@ -42,8 +42,16 @@ export default function RideHistoryScreen() {
     loadRideHistory();
   }, [user]);
 
-  const loadRideHistory = async (refresh = false) => {
+  useEffect(() => {
+    if (user?.id) {
+      loadRideHistory();
+    }
+  }, [filter]);
+
+  const loadRideHistory = async (refresh = false, filterOverride?: typeof filter) => {
     if (!user?.id) return;
+
+    const currentFilter = filterOverride ?? filter;
 
     try {
       if (refresh) {
@@ -53,7 +61,7 @@ export default function RideHistoryScreen() {
       }
 
       const response = await rideService.getRidesByPassenger(user.id, {
-        status: filter === "all" ? undefined : filter,
+        status: currentFilter === "all" ? undefined : currentFilter,
         limit: 50,
         page: 1,
         fields:
@@ -84,10 +92,11 @@ export default function RideHistoryScreen() {
             : undefined,
         }));
 
+        // Apply client-side filtering as backup (remove this if API filtering works properly)
         const filteredRides =
-          filter === "all"
+          currentFilter === "all"
             ? transformedRides
-            : transformedRides.filter((ride) => ride.status === filter);
+            : transformedRides.filter((ride) => ride.status === currentFilter);
 
         setRides(filteredRides);
       }
@@ -225,7 +234,7 @@ export default function RideHistoryScreen() {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
-        <Text className="text-white text-lg font-semibold">Ride History</Text>
+        <Text className="text-white text-lg font-semibold">History</Text>
         <TouchableOpacity onPress={() => loadRideHistory(true)}>
           <Ionicons name="refresh" size={24} color="white" />
         </TouchableOpacity>
@@ -233,22 +242,21 @@ export default function RideHistoryScreen() {
 
       {/* Filter Tabs */}
       <View className="bg-white px-6 py-4 border-b border-gray-200">
-        <View className="flex-row space-x-4 gap-4">
+        <View className="flex-row justify-between">
           {(["all", "completed", "cancelled"] as const).map((status) => (
             <TouchableOpacity
               key={status}
               onPress={() => {
                 setFilter(status);
-                loadRideHistory();
               }}
-              className={`px-4 py-2 rounded-lg ${filter === status ? "bg-black" : "bg-gray-100"}`}
+              className={`flex-1 mx-1 px-3 py-2 rounded-lg ${filter === status ? "bg-black" : "bg-gray-100"}`}
             >
               <Text
-                className={`font-medium capitalize ${
+                className={`font-medium capitalize text-center ${
                   filter === status ? "text-white" : "text-gray-600"
                 }`}
               >
-                {status === "all" ? "All Rides" : status}
+                {status === "all" ? "All" : status}
               </Text>
             </TouchableOpacity>
           ))}

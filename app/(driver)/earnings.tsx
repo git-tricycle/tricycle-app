@@ -246,7 +246,7 @@ export default function EarningsScreen() {
         {/* Period Selector */}
         <View className="px-6 py-4">
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View className="flex-row space-x-3">
+            <View className="flex-row space-x-3 gap-3">
               {[
                 { key: "today", label: "Today" },
                 { key: "week", label: "This Week" },
@@ -306,11 +306,11 @@ export default function EarningsScreen() {
             <View className="flex-row justify-between mb-4">
               <View className="items-center flex-1">
                 <Text className="text-2xl font-bold text-black">₱{earnings.total}</Text>
-                <Text className="text-gray-500 text-sm">Total Earned</Text>
+                <Text className="text-gray-500 text-sm">Earned</Text>
               </View>
               <View className="items-center flex-1">
                 <Text className="text-2xl font-bold text-black">{earnings.totalTrips}</Text>
-                <Text className="text-gray-500 text-sm">Total Trips</Text>
+                <Text className="text-gray-500 text-sm">Trips</Text>
               </View>
               <View className="items-center flex-1">
                 <Text className="text-2xl font-bold text-black">

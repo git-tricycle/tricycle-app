@@ -247,9 +247,8 @@ export default function DriverProfileScreen() {
       }
 
       if (!result.canceled && result.assets[0]) {
-        // In a real app, you would upload the image to your server here
-        // For now, we'll just simulate the upload
-        await simulateDocumentUpload(documentType, result.assets[0].uri);
+        // Upload the document to the API
+        await uploadDocumentToAPI(documentType, result.assets[0].uri);
       }
     } catch (error) {
       console.error("Error picking image:", error);
@@ -259,33 +258,54 @@ export default function DriverProfileScreen() {
     }
   };
 
-  const simulateDocumentUpload = async (documentType: "license" | "validId", imageUri: string) => {
+  const uploadDocumentToAPI = async (documentType: "license" | "validId", imageUri: string) => {
     try {
-      // Simulate API call to update document
-      const updateField = documentType === "license" ? "licensePhoto" : "validIdPhoto";
+      if (!driverProfile?.id) {
+        Alert.alert("Error", "Driver profile not found. Please try again.");
+        return;
+      }
 
-      // In a real implementation, you would:
-      // 1. Upload image to file storage (AWS S3, Cloudinary, etc.)
-      // 2. Get the uploaded image URL
-      // 3. Update the driver profile with the image URL
+      // Prepare the file object for upload
+      const fileExtension = imageUri.split(".").pop() || "jpg";
+      const fileName = `${documentType}_${Date.now()}.${fileExtension}`;
 
-      const response = await driverService.updateDriver(user?.id || "", {
-        [updateField]: imageUri, // In real app, this would be the uploaded URL
-      });
+      const fileObject = {
+        uri: imageUri,
+        name: fileName,
+        type: `image/${fileExtension === "jpg" ? "jpeg" : fileExtension}`,
+      };
+
+      // Create the files object for the API
+      const files: any = {};
+      if (documentType === "license") {
+        files.licensePhoto = fileObject;
+      } else {
+        files.validIdPhoto = fileObject;
+      }
+
+      // Upload to API
+      const response = await driverService.uploadRequirements(driverProfile.id, files);
 
       if (response.success) {
-        // Update local state
-        if (driverProfile) {
+        // Update local state with the new data
+        if (response.data?.driver) {
           setDriverProfile({
             ...driverProfile,
-            [updateField]: imageUri,
+            ...response.data.driver,
           });
         }
 
+        // Show success message with verification status
+        const isNowVerified = response.data?.driver?.isVerified;
         Alert.alert(
           "Success",
-          `${documentType === "license" ? "License photo" : "Valid ID"} uploaded successfully!`
+          `${documentType === "license" ? "License photo" : "Valid ID"} uploaded successfully!${
+            isNowVerified ? " Your driver profile is now verified!" : ""
+          }`
         );
+
+        // Refresh profile data to get updated verification status
+        await loadProfileData();
       } else {
         Alert.alert("Upload Failed", response.message || "Failed to upload document");
       }
@@ -293,6 +313,239 @@ export default function DriverProfileScreen() {
       console.error("Error uploading document:", error);
       Alert.alert("Error", "Failed to upload document. Please try again.");
     }
+  };
+
+  const handleVehicleDocumentUpload = async (documentType: "vehiclePhoto" | "orCrPhoto") => {
+    try {
+      // Request permission to access media library
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Permission Required",
+          "Please grant permission to access your photos to upload documents."
+        );
+        return;
+      }
+
+      // Show options for camera or library
+      Alert.alert(
+        "Upload Document",
+        `Select ${documentType === "vehiclePhoto" ? "Vehicle Photo" : "OR/CR Document"}`,
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Camera", onPress: () => openVehicleImagePicker(documentType, "camera") },
+          { text: "Photo Library", onPress: () => openVehicleImagePicker(documentType, "library") },
+        ]
+      );
+    } catch (error) {
+      console.error("Error requesting permissions:", error);
+      Alert.alert("Error", "Failed to access camera/photos. Please try again.");
+    }
+  };
+
+  const openVehicleImagePicker = async (
+    documentType: "vehiclePhoto" | "orCrPhoto",
+    source: "camera" | "library"
+  ) => {
+    try {
+      setIsUploadingDocument(true);
+
+      let result;
+      if (source === "camera") {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== "granted") {
+          Alert.alert("Permission Required", "Please grant camera permission to take photos.");
+          return;
+        }
+        result = await ImagePicker.launchCameraAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [4, 3],
+          quality: 0.8,
+        });
+      } else {
+        result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [4, 3],
+          quality: 0.8,
+        });
+      }
+
+      if (!result.canceled && result.assets[0]) {
+        // Upload the document to the API
+        await uploadVehicleDocumentToAPI(documentType, result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error("Error picking image:", error);
+      Alert.alert("Error", "Failed to select image. Please try again.");
+    } finally {
+      setIsUploadingDocument(false);
+    }
+  };
+
+  const uploadVehicleDocumentToAPI = async (
+    documentType: "vehiclePhoto" | "orCrPhoto",
+    imageUri: string
+  ) => {
+    try {
+      if (!vehicle?.id) {
+        Alert.alert("Error", "Vehicle not found. Please try again.");
+        return;
+      }
+
+      // Prepare the file object for upload
+      const fileExtension = imageUri.split(".").pop() || "jpg";
+      const fileName = `${documentType}_${Date.now()}.${fileExtension}`;
+
+      const fileObject = {
+        uri: imageUri,
+        name: fileName,
+        type: `image/${fileExtension === "jpg" ? "jpeg" : fileExtension}`,
+      };
+
+      // Create the files object for the API
+      const files: any = {};
+      if (documentType === "vehiclePhoto") {
+        files.vehiclePhoto = fileObject;
+      } else {
+        files.orCrPhoto = fileObject;
+      }
+
+      // Upload to API
+      const response = await vehicleService.uploadVehicleDocuments(vehicle.id, files);
+
+      if (response.success) {
+        // Update local state with the new data
+        if (response.data?.vehicle) {
+          setVehicle({
+            ...vehicle,
+            ...response.data.vehicle,
+          });
+        }
+
+        Alert.alert(
+          "Success",
+          `${documentType === "vehiclePhoto" ? "Vehicle photo" : "OR/CR document"} uploaded successfully!`
+        );
+
+        // Refresh profile data to get updated vehicle status
+        await loadProfileData();
+      } else {
+        Alert.alert("Upload Failed", response.message || "Failed to upload document");
+      }
+    } catch (error) {
+      console.error("Error uploading vehicle document:", error);
+      Alert.alert("Error", "Failed to upload document. Please try again.");
+    }
+  };
+
+  const handleDeleteVehicleDocument = async (documentType: "vehiclePhoto" | "orCrPhoto") => {
+    if (!vehicle?.id) {
+      Alert.alert("Error", "Vehicle not found. Please try again.");
+      return;
+    }
+
+    Alert.alert(
+      "Delete Document",
+      `Are you sure you want to delete your ${documentType === "vehiclePhoto" ? "vehicle photo" : "OR/CR document"}?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setIsUploadingDocument(true);
+
+              const response = await vehicleService.deleteVehicleDocuments(
+                vehicle.id,
+                documentType
+              );
+
+              if (response.success) {
+                // Update local state
+                if (response.data) {
+                  setVehicle({
+                    ...vehicle,
+                    ...response.data,
+                  });
+                }
+
+                Alert.alert(
+                  "Success",
+                  `${documentType === "vehiclePhoto" ? "Vehicle photo" : "OR/CR document"} deleted successfully.`
+                );
+
+                // Refresh profile data
+                await loadProfileData();
+              } else {
+                Alert.alert("Delete Failed", response.message || "Failed to delete document");
+              }
+            } catch (error) {
+              console.error("Error deleting vehicle document:", error);
+              Alert.alert("Error", "Failed to delete document. Please try again.");
+            } finally {
+              setIsUploadingDocument(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDeleteDocument = async (documentType: "license" | "validId") => {
+    if (!driverProfile?.id) {
+      Alert.alert("Error", "Driver profile not found. Please try again.");
+      return;
+    }
+
+    Alert.alert(
+      "Delete Document",
+      `Are you sure you want to delete your ${documentType === "license" ? "license photo" : "valid ID"}? This will affect your verification status.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setIsUploadingDocument(true);
+
+              const response = await driverService.deleteRequirements(
+                driverProfile.id,
+                documentType
+              );
+
+              if (response.success) {
+                // Update local state
+                if (response.data) {
+                  setDriverProfile({
+                    ...driverProfile,
+                    ...response.data,
+                  });
+                }
+
+                Alert.alert(
+                  "Success",
+                  `${documentType === "license" ? "License photo" : "Valid ID"} deleted successfully.`
+                );
+
+                // Refresh profile data
+                await loadProfileData();
+              } else {
+                Alert.alert("Delete Failed", response.message || "Failed to delete document");
+              }
+            } catch (error) {
+              console.error("Error deleting document:", error);
+              Alert.alert("Error", "Failed to delete document. Please try again.");
+            } finally {
+              setIsUploadingDocument(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleLogout = () => {
@@ -367,16 +620,20 @@ export default function DriverProfileScreen() {
       >
         {/* Profile Header */}
         <View className="bg-white mx-6 mt-6 rounded-2xl p-6 shadow-sm">
-          <View className="items-center mb-6">
-            <View className="w-20 h-20 bg-black rounded-full items-center justify-center mb-4">
+          <View className="mb-6 items-center">
+            <View className="w-20 h-20 bg-black rounded-full mb-4 items-center justify-center self-center">
               <Text className="text-white text-2xl font-bold">
                 {user?.firstName?.charAt(0) || "D"}
               </Text>
             </View>
-            <Text className="text-black text-xl font-bold">
+            <Text
+              className="text-black text-xl font-bold text-center"
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
               {user?.firstName} {user?.lastName}
             </Text>
-            <Text className="text-gray-600">{user?.email}</Text>
+            <Text className="text-gray-600 text-center">{user?.email}</Text>
 
             {/* Verification Status */}
             <View
@@ -483,9 +740,14 @@ export default function DriverProfileScreen() {
 
             {driverProfile?.licensePhoto ? (
               <View className="bg-green-50 border border-green-200 rounded-xl p-4">
-                <View className="flex-row items-center">
-                  <Ionicons name="checkmark-circle" size={20} color="#22c55e" />
-                  <Text className="text-green-700 ml-2 font-medium">License photo uploaded</Text>
+                <View className="flex-row items-center justify-between">
+                  <View className="flex-row items-center">
+                    <Ionicons name="checkmark-circle" size={20} color="#22c55e" />
+                    <Text className="text-green-700 ml-2 font-medium">License photo uploaded</Text>
+                  </View>
+                  <TouchableOpacity onPress={() => handleDeleteDocument("license")} className="p-2">
+                    <Ionicons name="trash" size={16} color="#ef4444" />
+                  </TouchableOpacity>
                 </View>
                 <Text className="text-green-600 text-sm mt-1">
                   Your driver's license has been submitted for verification.
@@ -533,9 +795,14 @@ export default function DriverProfileScreen() {
 
             {driverProfile?.validIdPhoto ? (
               <View className="bg-green-50 border border-green-200 rounded-xl p-4">
-                <View className="flex-row items-center">
-                  <Ionicons name="checkmark-circle" size={20} color="#22c55e" />
-                  <Text className="text-green-700 ml-2 font-medium">Valid ID uploaded</Text>
+                <View className="flex-row items-center justify-between">
+                  <View className="flex-row items-center">
+                    <Ionicons name="checkmark-circle" size={20} color="#22c55e" />
+                    <Text className="text-green-700 ml-2 font-medium">Valid ID uploaded</Text>
+                  </View>
+                  <TouchableOpacity onPress={() => handleDeleteDocument("validId")} className="p-2">
+                    <Ionicons name="trash" size={16} color="#ef4444" />
+                  </TouchableOpacity>
                 </View>
                 <Text className="text-green-600 text-sm mt-1">
                   Your government ID has been submitted for verification.
@@ -594,19 +861,51 @@ export default function DriverProfileScreen() {
                       <Ionicons name="camera" size={16} color="#6b7280" />
                       <Text className="text-gray-700 ml-2">Vehicle Photo</Text>
                     </View>
-                    <TouchableOpacity className="bg-gray-100 rounded-lg px-3 py-1">
-                      <Text className="text-black text-sm font-medium">
-                        {vehicle.vehiclePhoto ? "Replace" : "Upload"}
-                      </Text>
+                    <TouchableOpacity
+                      onPress={() => handleVehicleDocumentUpload("vehiclePhoto")}
+                      disabled={isUploadingDocument}
+                      className="bg-gray-100 rounded-lg px-3 py-1"
+                    >
+                      {isUploadingDocument ? (
+                        <ActivityIndicator size="small" color="#000" />
+                      ) : (
+                        <Text className="text-black text-sm font-medium">
+                          {vehicle.vehiclePhoto ? "Replace" : "Upload"}
+                        </Text>
+                      )}
                     </TouchableOpacity>
                   </View>
                   {vehicle.vehiclePhoto ? (
                     <View className="bg-green-50 border border-green-200 rounded-lg p-3">
-                      <Text className="text-green-700 text-sm">✓ Vehicle photo uploaded</Text>
+                      <View className="flex-row items-center justify-between">
+                        <View className="flex-row items-center">
+                          <Ionicons name="checkmark-circle" size={20} color="#22c55e" />
+                          <Text className="text-green-700 ml-2 font-medium">
+                            Vehicle photo uploaded
+                          </Text>
+                        </View>
+                        <TouchableOpacity
+                          onPress={() => handleDeleteVehicleDocument("vehiclePhoto")}
+                          className="p-2"
+                        >
+                          <Ionicons name="trash" size={16} color="#ef4444" />
+                        </TouchableOpacity>
+                      </View>
+                      <Text className="text-green-600 text-sm mt-1">
+                        Your vehicle photo has been uploaded successfully.
+                      </Text>
                     </View>
                   ) : (
                     <View className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                      <Text className="text-yellow-700 text-sm">⚠ Vehicle photo required</Text>
+                      <View className="flex-row items-center">
+                        <Ionicons name="warning" size={20} color="#f59e0b" />
+                        <Text className="text-yellow-700 ml-2 font-medium">
+                          Vehicle photo required
+                        </Text>
+                      </View>
+                      <Text className="text-yellow-600 text-sm mt-1">
+                        Please upload a clear photo of your vehicle.
+                      </Text>
                     </View>
                   )}
                 </View>
@@ -618,19 +917,52 @@ export default function DriverProfileScreen() {
                       <Ionicons name="document" size={16} color="#6b7280" />
                       <Text className="text-gray-700 ml-2">OR/CR Document</Text>
                     </View>
-                    <TouchableOpacity className="bg-gray-100 rounded-lg px-3 py-1">
-                      <Text className="text-black text-sm font-medium">
-                        {(vehicle as any).orCrUpload ? "Replace" : "Upload"}
-                      </Text>
+                    <TouchableOpacity
+                      onPress={() => handleVehicleDocumentUpload("orCrPhoto")}
+                      disabled={isUploadingDocument}
+                      className="bg-gray-100 rounded-lg px-3 py-1"
+                    >
+                      {isUploadingDocument ? (
+                        <ActivityIndicator size="small" color="#000" />
+                      ) : (
+                        <Text className="text-black text-sm font-medium">
+                          {vehicle.orCrPhoto ? "Replace" : "Upload"}
+                        </Text>
+                      )}
                     </TouchableOpacity>
                   </View>
-                  {(vehicle as any).orCrUpload ? (
+                  {vehicle.orCrPhoto ? (
                     <View className="bg-green-50 border border-green-200 rounded-lg p-3">
-                      <Text className="text-green-700 text-sm">✓ OR/CR document uploaded</Text>
+                      <View className="flex-row items-center justify-between">
+                        <View className="flex-row items-center">
+                          <Ionicons name="checkmark-circle" size={20} color="#22c55e" />
+                          <Text className="text-green-700 ml-2 font-medium">
+                            OR/CR document uploaded
+                          </Text>
+                        </View>
+                        <TouchableOpacity
+                          onPress={() => handleDeleteVehicleDocument("orCrPhoto")}
+                          className="p-2"
+                        >
+                          <Ionicons name="trash" size={16} color="#ef4444" />
+                        </TouchableOpacity>
+                      </View>
+                      <Text className="text-green-600 text-sm mt-1">
+                        Your OR/CR document has been uploaded successfully.
+                      </Text>
                     </View>
                   ) : (
                     <View className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                      <Text className="text-yellow-700 text-sm">⚠ OR/CR document required</Text>
+                      <View className="flex-row items-center">
+                        <Ionicons name="warning" size={20} color="#f59e0b" />
+                        <Text className="text-yellow-700 ml-2 font-medium">
+                          OR/CR document required
+                        </Text>
+                      </View>
+                      <Text className="text-yellow-600 text-sm mt-1">
+                        Please upload your Official Receipt (OR) and Certificate of Registration
+                        (CR).
+                      </Text>
                     </View>
                   )}
                 </View>

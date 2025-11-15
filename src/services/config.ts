@@ -3,7 +3,7 @@ export const API_CONFIG = {
   // Development configurations
   ANDROID_EMULATOR: "http://10.0.2.2:5000/api",
   IOS_SIMULATOR: "http://localhost:5000/api",
-  PHYSICAL_DEVICE: "http://192.168.1.6:5000/api", // Your computer's IP address
+  PHYSICAL_DEVICE: "http://192.168.1.15:5000/api", // Your computer's IP address
   EXPO_TUNNEL: "https://your-tunnel-url.ngrok.io/api", // If using ngrok or similar
 
   // Production

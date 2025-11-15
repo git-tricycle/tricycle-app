@@ -1,4 +1,4 @@
-import { apiClient, ApiResponse, SearchParams } from './api.client';
+import { apiClient, ApiResponse, SearchParams } from "./api.client";
 
 // Student Types matching API schema
 export interface Student {
@@ -63,7 +63,7 @@ class StudentService {
    * Get all students
    */
   async getStudents(filters?: StudentFilters): Promise<ApiResponse<Student[]>> {
-    return apiClient.get<Student[]>('/student', filters);
+    return apiClient.get<Student[]>("/student", filters);
   }
 
   /**
@@ -77,7 +77,7 @@ class StudentService {
    * Create student profile (used internally by auth service)
    */
   async createStudent(studentData: CreateStudentRequest): Promise<ApiResponse<Student>> {
-    return apiClient.post<Student>('/student', studentData);
+    return apiClient.post<Student>("/student", studentData);
   }
 
   /**
@@ -92,6 +92,20 @@ class StudentService {
    */
   async deleteStudent(id: string): Promise<ApiResponse<void>> {
     return apiClient.put<void>(`/student/${id}`);
+  }
+
+  /**
+   * Upload student ID photo
+   */
+  async uploadStudentIDPhoto(studentId: string, file: FormData): Promise<ApiResponse<any>> {
+    return apiClient.postFormData<any>(`/student/${studentId}/upload-student-id`, file);
+  }
+
+  /**
+   * Delete student ID photo
+   */
+  async deleteStudentIDPhoto(studentId: string): Promise<ApiResponse<Student>> {
+    return apiClient.delete<Student>(`/student/${studentId}/delete-student-id`);
   }
 }
 

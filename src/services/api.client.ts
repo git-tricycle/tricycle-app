@@ -211,6 +211,72 @@ export class ApiClient {
       body: JSON.stringify(body),
     });
   }
+
+  async delete<T>(endpoint: string): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, {
+      method: "DELETE",
+    });
+  }
+
+  async postFormData<T>(endpoint: string, formData: FormData): Promise<ApiResponse<T>> {
+    try {
+      const token = await TokenStorage.getToken();
+      let url = `${this.baseURL}${endpoint}`;
+
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+
+      console.log("Making FormData API request to:", url);
+      console.log("FormData headers:", headers);
+
+      const response = await fetch(url, {
+        method: "POST",
+        body: formData,
+        headers,
+      });
+
+      console.log("Response status:", response.status);
+
+      const contentType = response.headers.get("content-type") || "";
+      let parsedBody: any = null;
+
+      try {
+        if (contentType.includes("application/json")) {
+          parsedBody = await response.json();
+        } else {
+          parsedBody = await response.text();
+        }
+      } catch (parseError) {
+        console.warn("Failed to parse response body:", parseError);
+      }
+
+      console.log("Response data:", parsedBody);
+
+      if (!response.ok) {
+        throw createApiError(
+          response.status,
+          parsedBody,
+          `HTTP ${response.status}: Network request failed`
+        );
+      }
+
+      if (contentType.includes("application/json") && typeof parsedBody === "object") {
+        return parsedBody;
+      }
+
+      return {
+        success: true,
+        message: "Request successful",
+        data: parsedBody as T,
+      };
+    } catch (error) {
+      console.error("FormData API Request Error:", error);
+      console.error("Request URL:", `${this.baseURL}${endpoint}`);
+      throw error;
+    }
+  }
 }
 
 // Singleton instance

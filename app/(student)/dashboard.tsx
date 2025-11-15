@@ -66,12 +66,6 @@ export default function StudentDashboard() {
                 Good morning, {user?.firstName || "Student"}! 👋
               </Text>
             </View>
-            <TouchableOpacity
-              onPress={handleLogout}
-              className="w-10 h-10 bg-white/20 rounded-full items-center justify-center"
-            >
-              <Ionicons name="log-out" size={20} color="white" />
-            </TouchableOpacity>
           </View>
         </View>
 
@@ -125,12 +119,9 @@ export default function StudentDashboard() {
 
         {/* Recent Activity */}
         <View className="px-6 mt-6">
-          <View className="bg-white rounded-2xl p-6 shadow-sm">
-            <View className="flex-row justify-between items-center mb-4">
+          <View className="bg-white rounded-2xl p-2 shadow-sm">
+            <View className="mb-4">
               <Text className="text-black text-lg font-semibold">Recent Activity</Text>
-              <TouchableOpacity onPress={handleViewHistory}>
-                <Text className="text-black text-sm">View All</Text>
-              </TouchableOpacity>
             </View>
 
             {loadingRecent ? (
