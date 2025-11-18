@@ -19,6 +19,7 @@ export interface PaginationParams {
 
 export interface SearchParams extends PaginationParams {
   query?: string;
+  fields?: string;
   filters?: Record<string, any>;
 }
 
