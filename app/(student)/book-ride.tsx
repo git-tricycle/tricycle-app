@@ -18,6 +18,7 @@ import { useAuth } from "@/src/contexts/AuthContext";
 import { rideService } from "@/src/services/ride.service";
 import { driverService } from "@/src/services/driver.service";
 import { getRouteBetween } from "@/src/services/directions.service";
+import { fareService } from "@/src/services/fare.service";
 
 type BookingStep =
   | "location-selection"
@@ -133,13 +134,53 @@ export default function BookRideScreen() {
     };
   }, [currentRide?.id, currentRide?.status]);
 
-  const calculateEstimatedFare = () => {
-    // Simple distance-based fare calculation (mock)
-    const distance = calculateDistance(pickupLocation!, dropoffLocation!);
-    const baseFare = 15; // Base fare in PHP
-    const perKmRate = 8; // Rate per kilometer
-    const fare = baseFare + distance * perKmRate;
-    setEstimatedFare(Math.round(fare));
+  const calculateEstimatedFare = async () => {
+    try {
+      let distance;
+      let estimatedTime;
+
+      // Try to get actual route distance first
+      try {
+        const routeCoordinates = await getRouteBetween(pickupLocation!, dropoffLocation!);
+
+        if (routeCoordinates.length > 1) {
+          // Calculate distance along the actual route
+          distance = calculateRouteDistance(routeCoordinates);
+          // Estimate time based on average tricycle speed (28 km/h)
+          estimatedTime = Math.max(3, Math.ceil((distance / 28) * 60 + 2)); // minutes
+        } else {
+          // Fallback to straight-line distance
+          distance = calculateDistance(pickupLocation!, dropoffLocation!);
+          estimatedTime = Math.max(3, Math.ceil((distance / 28) * 60 + 2));
+        }
+      } catch (routeError) {
+        console.warn("Route calculation failed, using straight-line distance:", routeError);
+        // Fallback to straight-line distance
+        distance = calculateDistance(pickupLocation!, dropoffLocation!);
+        estimatedTime = Math.max(3, Math.ceil((distance / 28) * 60 + 2));
+      }
+
+      // Call API with distance and estimated time
+      const response = await fareService.calculateFare(distance, { estimatedTime });
+
+      if (response.success && response.data) {
+        setEstimatedFare(Math.round(response.data.calculatedFare));
+      } else {
+        // Fallback to hardcoded values if API fails
+        const baseFare = 15;
+        const perKmRate = 8;
+        const fare = baseFare + distance * perKmRate;
+        setEstimatedFare(Math.round(fare));
+      }
+    } catch (error) {
+      console.error("Error calculating fare:", error);
+      // Fallback to hardcoded values
+      const distance = calculateDistance(pickupLocation!, dropoffLocation!);
+      const baseFare = 15;
+      const perKmRate = 8;
+      const fare = baseFare + distance * perKmRate;
+      setEstimatedFare(Math.round(fare));
+    }
   };
 
   const calculateDistance = (location1: Location, location2: Location): number => {
@@ -155,6 +196,14 @@ export default function BookRideScreen() {
         Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
+  };
+
+  const calculateRouteDistance = (coordinates: Location[]): number => {
+    let totalDistance = 0;
+    for (let i = 0; i < coordinates.length - 1; i++) {
+      totalDistance += calculateDistance(coordinates[i], coordinates[i + 1]);
+    }
+    return totalDistance;
   };
 
   const calculateETA = (currentLocation: Location, destinationLocation: Location): number => {

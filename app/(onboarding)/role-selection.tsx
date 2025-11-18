@@ -13,6 +13,10 @@ export default function RoleSelectionScreen() {
     router.push("/(auth)/driver-login");
   };
 
+  const handleAdminSelect = () => {
+    router.push("/(auth)/admin-login");
+  };
+
   const handleBack = () => {
     router.back();
   };
@@ -39,7 +43,9 @@ export default function RoleSelectionScreen() {
         </View>
 
         {/* Title */}
-        <Text className="text-3xl font-bold text-black text-center mb-4">Choose Your Role</Text>
+        <Text className="text-2xl font-extrabold text-black text-center mb-4">
+          Choose Your Role
+        </Text>
 
         <Text className="text-lg text-gray-600 text-center mb-12">
           Select how you want to use Ride It
@@ -68,7 +74,7 @@ export default function RoleSelectionScreen() {
           {/* Driver Option */}
           <TouchableOpacity
             onPress={handleDriverSelect}
-            className="w-full bg-white rounded-2xl p-6 border-2 border-black"
+            className="w-full bg-white rounded-2xl p-6 border-2 border-black mb-3"
             activeOpacity={0.8}
           >
             <View className="flex-row items-center">
@@ -80,6 +86,24 @@ export default function RoleSelectionScreen() {
                 <Text className="text-gray-600 text-base">Provide tricycle rides and earn</Text>
               </View>
               <Ionicons name="chevron-forward" size={24} color="black" />
+            </View>
+          </TouchableOpacity>
+
+          {/* Admin Option */}
+          <TouchableOpacity
+            onPress={handleAdminSelect}
+            className="w-full bg-blue-600 rounded-2xl p-6 border-2 border-blue-600"
+            activeOpacity={0.8}
+          >
+            <View className="flex-row items-center">
+              <View className="w-16 h-16 bg-blue-700 rounded-full items-center justify-center mr-4">
+                <Ionicons name="shield-checkmark" size={32} color="white" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-white font-bold text-xl mb-1">I&apos;m an Admin</Text>
+                <Text className="text-blue-100 text-base">Manage users and system settings</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={24} color="white" />
             </View>
           </TouchableOpacity>
         </View>

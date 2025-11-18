@@ -1,4 +1,4 @@
-import { Stack } from 'expo-router';
+import { Stack } from "expo-router";
 
 export default function AuthLayout() {
   return (
@@ -7,6 +7,7 @@ export default function AuthLayout() {
       <Stack.Screen name="student-register" />
       <Stack.Screen name="driver-login" />
       <Stack.Screen name="driver-register" />
+      <Stack.Screen name="admin-login" />
     </Stack>
   );
 }

@@ -31,6 +31,20 @@ export interface User {
     isVerified: boolean;
     isDeleted: boolean;
   };
+  studentProfile?: {
+    id: string;
+    userId: string;
+    studentId: string;
+    dateOfBirth: string;
+    course?: string;
+    yearLevel?: string;
+    schoolEmail?: string;
+    emergencyContactName?: string;
+    emergencyContactNumber?: string;
+    studentIdPhoto?: string;
+    isVerified: boolean;
+    isDeleted: boolean;
+  };
 }
 
 export interface CreateUserRequest {
