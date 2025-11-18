@@ -101,35 +101,14 @@ export default function AdminSettingsScreen() {
             icon="calculator"
             title="Fare Management"
             subtitle="Configure base fare and rates"
-            onPress={() => Alert.alert("Info", "Use the Fare Settings tab to manage fare rates")}
+            onPress={() => router.push("/(admin)/fare-management")}
           />
 
           <SettingsItem
             icon="people"
             title="User Management"
             subtitle="Manage users and permissions"
-            onPress={() => Alert.alert("Info", "Use the Users tab to manage all users")}
-          />
-
-          <SettingsItem
-            icon="notifications"
-            title="Notifications"
-            subtitle="Configure system notifications"
-            onPress={() =>
-              Alert.alert(
-                "Coming Soon",
-                "Notification settings will be available in a future update"
-              )
-            }
-          />
-
-          <SettingsItem
-            icon="shield-checkmark"
-            title="Security Settings"
-            subtitle="Manage security and access controls"
-            onPress={() =>
-              Alert.alert("Coming Soon", "Security settings will be available in a future update")
-            }
+            onPress={() => router.push("/(admin)/users")}
           />
         </View>
 
@@ -151,7 +130,10 @@ export default function AdminSettingsScreen() {
             title="Help & Support"
             subtitle="Get help and contact support"
             onPress={() =>
-              Alert.alert("Support", "For support, please contact the system administrator")
+              Alert.alert(
+                "Help & Support",
+                "Need assistance?\n\n• Email: tricycle.book.app@gmail.com\n• Hotline: +63 912 345 6789\n• Hours: Mon–Fri, 8am–6pm\n\nOur support team will respond within 24 hours."
+              )
             }
           />
 
@@ -160,7 +142,10 @@ export default function AdminSettingsScreen() {
             title="Terms & Privacy"
             subtitle="View terms of service and privacy policy"
             onPress={() =>
-              Alert.alert("Coming Soon", "Terms and privacy policy will be available soon")
+              Alert.alert(
+                "Terms & Privacy",
+                "Usage of the Tricycle Admin Dashboard is governed by our Terms of Service and Privacy Policy.\n\n• We collect admin profile information to keep accounts secure.\n• Ride and fare data are stored securely in our cloud infrastructure.\n• Access is restricted to authorized personnel only."
+              )
             }
           />
         </View>
