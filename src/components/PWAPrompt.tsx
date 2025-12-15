@@ -8,31 +8,26 @@ export default function PWAPrompt() {
   const { updateAvailable, updateApp } = useServiceWorker();
   const [showPrompt, setShowPrompt] = useState(true);
 
+  // Debug logging
+  React.useEffect(() => {
+    if (Platform.OS === "web") {
+      console.log(
+        "🎯 PWAPrompt mounted - isSupported:",
+        isSupported,
+        "isInstallable:",
+        isInstallable
+      );
+    }
+  }, [isSupported, isInstallable]);
+
   // Don't render on native platforms
-  if (Platform.OS !== "web" || !isSupported) {
+  if (typeof window === "undefined" || !isSupported) {
+    console.log("⏭️  Skipping PWAPrompt - window:", typeof window, "isSupported:", isSupported);
     return null;
   }
 
-  // Show update prompt if update is available
-  if (updateAvailable) {
-    return (
-      <View className="fixed top-0 left-0 right-0 bg-blue-600 text-white p-3 z-50 flex-row items-center justify-between">
-        <View className="flex-row items-center flex-1">
-          <Ionicons name="download" size={20} color="white" />
-          <Text className="text-white ml-2 flex-1">A new version is available!</Text>
-        </View>
-        <TouchableOpacity
-          onPress={updateApp}
-          className="bg-white bg-opacity-20 px-3 py-1 rounded"
-          style={{ cursor: "pointer" }}
-        >
-          <Text className="text-white font-medium">Update</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  // Show install prompt if app is installable and user hasn't dismissed it
+  // Show install prompt instead of update notification
+  // Prioritize install prompt even when update is available
   if (isInstallable && showPrompt) {
     return (
       <View className="fixed bottom-4 left-4 right-4 bg-black text-white p-4 rounded-xl shadow-lg z-50 flex-row items-center justify-between max-w-md mx-auto">
@@ -47,7 +42,10 @@ export default function PWAPrompt() {
         </View>
         <View className="flex-row items-center ml-3">
           <TouchableOpacity
-            onPress={() => setShowPrompt(false)}
+            onPress={() => {
+              console.log("❌ User dismissed PWA install prompt");
+              setShowPrompt(false);
+            }}
             className="p-2"
             style={{ cursor: "pointer" }}
           >
@@ -55,13 +53,14 @@ export default function PWAPrompt() {
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => {
+              console.log("✅ User clicked install button");
               install();
               setShowPrompt(false);
             }}
-            className="bg-white px-3 py-2 rounded-lg ml-2"
+            className="bg-blue-500 px-4 py-2 rounded-lg ml-2"
             style={{ cursor: "pointer" }}
           >
-            <Text className="text-black font-semibold">Install</Text>
+            <Text className="text-white font-semibold text-center">Install</Text>
           </TouchableOpacity>
         </View>
       </View>

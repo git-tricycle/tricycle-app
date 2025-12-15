@@ -5,17 +5,20 @@ const OFFLINE_URL = "/offline.html";
 // URLs to cache for offline functionality
 const urlsToCache = ["/", "/manifest.json", "/icon-192.png", "/icon-512.png", OFFLINE_URL];
 
+console.log("🔧 Service Worker file loaded");
+
 // Install event - cache resources
 self.addEventListener("install", (event) => {
+  console.log("🔧 SW: install event");
   event.waitUntil(
     caches
       .open(CACHE_NAME)
       .then((cache) => {
-        console.log("Opened cache");
+        console.log("📦 SW: Opened cache");
         return cache.addAll(urlsToCache);
       })
       .catch((error) => {
-        console.log("Cache addAll error:", error);
+        console.error("❌ SW: Cache addAll error:", error);
       })
   );
 
@@ -25,12 +28,13 @@ self.addEventListener("install", (event) => {
 
 // Activate event - clean up old caches
 self.addEventListener("activate", (event) => {
+  console.log("🔧 SW: activate event");
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheName !== CACHE_NAME) {
-            console.log("Deleting old cache:", cacheName);
+            console.log("🔧 SW: Deleting old cache:", cacheName);
             return caches.delete(cacheName);
           }
         })
