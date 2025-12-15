@@ -15,6 +15,12 @@ import { Colors } from "@/src/constants/theme";
 import { userService } from "@/src/services/user.service";
 import { studentService } from "@/src/services/student.service";
 import { driverService } from "@/src/services/driver.service";
+import {
+  showErrorAlert,
+  showSuccessAlert,
+  showDestructiveConfirm,
+  showWarningConfirm,
+} from "@/src/utils/alerts";
 
 interface User {
   id: string;
@@ -102,11 +108,17 @@ export default function UsersScreen() {
           students: studentsResponse.success,
           drivers: driversResponse.success,
         });
-        Alert.alert("Error", "Failed to load users data");
+        showErrorAlert(
+          "Loading Error",
+          "Failed to load users data. Please check your connection and try again."
+        );
       }
     } catch (error) {
       console.error("Error loading users:", error);
-      Alert.alert("Error", "Failed to load users");
+      showErrorAlert(
+        "Network Error",
+        "Failed to load users. Please check your internet connection."
+      );
     } finally {
       setIsLoading(false);
       setRefreshing(false);
@@ -139,6 +151,50 @@ export default function UsersScreen() {
     setFilteredUsers(filtered);
   };
 
+  const confirmUserStatusChange = (
+    userId: string,
+    newStatus: "active" | "inactive" | "banned",
+    userName: string
+  ) => {
+    const statusActions = {
+      active: {
+        title: "Activate User Account",
+        message: `Are you sure you want to activate ${userName}'s account? They will be able to use the app normally.`,
+        confirmText: "Activate",
+      },
+      inactive: {
+        title: "Deactivate User Account",
+        message: `Are you sure you want to deactivate ${userName}'s account? They will not be able to log in until reactivated.`,
+        confirmText: "Deactivate",
+      },
+      banned: {
+        title: "Ban User Account",
+        message: `Are you sure you want to ban ${userName}'s account? This is a serious action that should only be taken for policy violations.`,
+        confirmText: "Ban User",
+      },
+    };
+
+    const action = statusActions[newStatus];
+
+    if (newStatus === "banned") {
+      showDestructiveConfirm(
+        action.title,
+        action.message,
+        () => handleUserStatusChange(userId, newStatus),
+        undefined,
+        action.confirmText
+      );
+    } else {
+      showWarningConfirm(
+        action.title,
+        action.message,
+        () => handleUserStatusChange(userId, newStatus),
+        undefined,
+        action.confirmText
+      );
+    }
+  };
+
   const handleUserStatusChange = async (
     userId: string,
     newStatus: "active" | "inactive" | "banned"
@@ -150,45 +206,49 @@ export default function UsersScreen() {
         setUsers((prev) =>
           prev.map((user) => (user.id === userId ? { ...user, status: newStatus } : user))
         );
-        Alert.alert("Success", `User status updated to ${newStatus}`);
+
+        const statusMessages = {
+          active: "User account has been activated successfully",
+          inactive: "User account has been deactivated successfully",
+          banned: "User account has been banned successfully",
+        };
+
+        showSuccessAlert("Status Updated", statusMessages[newStatus]);
         setShowUserModal(false);
       } else {
-        Alert.alert("Error", "Failed to update user status");
+        showErrorAlert("Update Failed", response.message || "Failed to update user status");
       }
     } catch (error) {
       console.error("Error updating user status:", error);
-      Alert.alert("Error", "Failed to update user status");
+      showErrorAlert("Update Error", "Failed to update user status. Please try again.");
     }
   };
 
-  const handleDeleteUser = async (userId: string) => {
-    Alert.alert(
-      "Delete User",
-      "Are you sure you want to delete this user? This action cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              const response = await userService.deleteUser(userId);
-
-              if (response.success) {
-                setUsers((prev) => prev.filter((user) => user.id !== userId));
-                Alert.alert("Success", "User deleted successfully");
-                setShowUserModal(false);
-              } else {
-                Alert.alert("Error", "Failed to delete user");
-              }
-            } catch (error) {
-              console.error("Error deleting user:", error);
-              Alert.alert("Error", "Failed to delete user");
-            }
-          },
-        },
-      ]
+  const confirmDeleteUser = (userId: string, userName: string) => {
+    showDestructiveConfirm(
+      "Delete User Account",
+      `Are you sure you want to permanently delete ${userName}'s account? This action cannot be undone and will remove all their data including ride history, ratings, and profile information.`,
+      () => handleDeleteUser(userId),
+      undefined,
+      "Delete Permanently"
     );
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    try {
+      const response = await userService.deleteUser(userId);
+
+      if (response.success) {
+        setUsers((prev) => prev.filter((user) => user.id !== userId));
+        showSuccessAlert("User Deleted", "User account has been permanently deleted");
+        setShowUserModal(false);
+      } else {
+        showErrorAlert("Deletion Failed", response.message || "Failed to delete user account");
+      }
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      showErrorAlert("Deletion Error", "Failed to delete user account. Please try again.");
+    }
   };
 
   useEffect(() => {
@@ -577,7 +637,13 @@ export default function UsersScreen() {
                   {selectedUser.status !== "active" && (
                     <TouchableOpacity
                       className="bg-green-50 border border-green-200 rounded-xl p-4 flex-row items-center"
-                      onPress={() => handleUserStatusChange(selectedUser.id, "active")}
+                      onPress={() =>
+                        confirmUserStatusChange(
+                          selectedUser.id,
+                          "active",
+                          `${selectedUser.firstName} ${selectedUser.lastName}`
+                        )
+                      }
                     >
                       <Ionicons name="checkmark-circle" size={24} color="#10B981" />
                       <Text className="text-green-700 font-medium ml-3">Activate User</Text>
@@ -587,7 +653,13 @@ export default function UsersScreen() {
                   {selectedUser.status !== "inactive" && (
                     <TouchableOpacity
                       className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex-row items-center"
-                      onPress={() => handleUserStatusChange(selectedUser.id, "inactive")}
+                      onPress={() =>
+                        confirmUserStatusChange(
+                          selectedUser.id,
+                          "inactive",
+                          `${selectedUser.firstName} ${selectedUser.lastName}`
+                        )
+                      }
                     >
                       <Ionicons name="pause-circle" size={24} color="#F59E0B" />
                       <Text className="text-yellow-700 font-medium ml-3">Deactivate User</Text>
@@ -597,7 +669,13 @@ export default function UsersScreen() {
                   {selectedUser.status !== "banned" && (
                     <TouchableOpacity
                       className="bg-red-50 border border-red-200 rounded-xl p-4 flex-row items-center"
-                      onPress={() => handleUserStatusChange(selectedUser.id, "banned")}
+                      onPress={() =>
+                        confirmUserStatusChange(
+                          selectedUser.id,
+                          "banned",
+                          `${selectedUser.firstName} ${selectedUser.lastName}`
+                        )
+                      }
                     >
                       <Ionicons name="ban" size={24} color="#EF4444" />
                       <Text className="text-red-700 font-medium ml-3">Ban User</Text>
@@ -607,7 +685,12 @@ export default function UsersScreen() {
                   {/* Delete User */}
                   <TouchableOpacity
                     className="bg-red-50 border border-red-200 rounded-xl p-4 flex-row items-center"
-                    onPress={() => handleDeleteUser(selectedUser.id)}
+                    onPress={() =>
+                      confirmDeleteUser(
+                        selectedUser.id,
+                        `${selectedUser.firstName} ${selectedUser.lastName}`
+                      )
+                    }
                   >
                     <Ionicons name="trash" size={24} color="#EF4444" />
                     <Text className="text-red-700 font-medium ml-3">Delete User</Text>

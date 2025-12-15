@@ -15,6 +15,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { showErrorAlert, showSuccessAlert } from "@/src/utils/alerts";
 
 type RegistrationStep = "personal" | "contact" | "security" | "verification";
 
@@ -113,9 +114,34 @@ export default function StudentRegisterScreen() {
     try {
       setIsLoading(true);
       await register(formData as StudentRegistrationData, "passenger");
+
+      showSuccessAlert(
+        "Registration Successful",
+        "Welcome to Ride It! Your student account has been created successfully."
+      );
       router.replace("/(student)/dashboard");
     } catch (error: any) {
-      Alert.alert("Registration Failed", error.message || "Please try again");
+      console.error("Student registration error:", error);
+
+      let errorMessage = "Please try again";
+
+      if (error.message) {
+        if (error.message.includes("email") && error.message.includes("exists")) {
+          errorMessage =
+            "An account with this email already exists. Please use a different email or try logging in.";
+        } else if (error.message.includes("student") && error.message.includes("exists")) {
+          errorMessage =
+            "This student ID is already registered. Please check your student ID or contact support.";
+        } else if (error.message.includes("network") || error.message.includes("fetch")) {
+          errorMessage = "Network error. Please check your internet connection and try again.";
+        } else if (error.message.includes("validation")) {
+          errorMessage = "Please check all required fields and try again.";
+        } else {
+          errorMessage = error.message;
+        }
+      }
+
+      showErrorAlert("Student Registration Failed", errorMessage);
     } finally {
       setIsLoading(false);
     }

@@ -62,6 +62,10 @@
         "mobile-web-app-capable": "yes",
         "msapplication-tap-highlight": "no"
       },
+      "icons": {
+        "icon": "./assets/images/tric.jpg",
+        "maskable": "./assets/images/tric.jpg"
+      },
       "build": {
         "babel": {
           "include": [

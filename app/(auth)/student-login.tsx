@@ -1,13 +1,23 @@
-import { useAuth } from '@/src/contexts/AuthContext';
-import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import React, { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAuth } from "@/src/contexts/AuthContext";
+import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
+import React, { useState } from "react";
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { showErrorAlert, showSuccessAlert } from "@/src/utils/alerts";
 
 export default function StudentLoginScreen() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -15,8 +25,20 @@ export default function StudentLoginScreen() {
   const { login } = useAuth();
 
   const handleLogin = async () => {
-    if (!email.trim() || !password.trim()) {
-      Alert.alert('Error', 'Please fill in all fields');
+    // Validation
+    if (!email.trim()) {
+      showErrorAlert("Validation Error", "Please enter your email address");
+      return;
+    }
+
+    if (!password.trim()) {
+      showErrorAlert("Validation Error", "Please enter your password");
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      showErrorAlert("Invalid Email", "Please enter a valid email address");
       return;
     }
 
@@ -25,20 +47,37 @@ export default function StudentLoginScreen() {
       await login({
         email: email.trim(),
         password: password.trim(),
-        role: 'passenger'
+        role: "passenger",
       });
-      
+
+      showSuccessAlert("Login Successful", "Welcome back, student!");
       // Navigation will be handled by the auth context
-      router.replace('/(student)/dashboard');
+      router.replace("/(student)/dashboard");
     } catch (error: any) {
-      Alert.alert('Login Failed', error.message || 'Please check your credentials and try again');
+      console.error("Student login error:", error);
+
+      let errorMessage = "Please check your credentials and try again";
+
+      if (error.message) {
+        if (error.message.includes("network") || error.message.includes("fetch")) {
+          errorMessage = "Network error. Please check your internet connection and try again.";
+        } else if (error.message.includes("unauthorized") || error.message.includes("invalid")) {
+          errorMessage = "Invalid email or password. Please check your credentials.";
+        } else if (error.message.includes("verification")) {
+          errorMessage = "Please verify your email address before logging in.";
+        } else {
+          errorMessage = error.message;
+        }
+      }
+
+      showErrorAlert("Student Login Failed", errorMessage);
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleRegister = () => {
-    router.push('/(auth)/student-register');
+    router.push("/(auth)/student-register");
   };
 
   const handleBack = () => {
@@ -47,18 +86,18 @@ export default function StudentLoginScreen() {
 
   const handleGoogleLogin = () => {
     // TODO: Implement Google login
-    Alert.alert('Coming Soon', 'Google login will be available soon');
+    showErrorAlert("Feature Coming Soon", "Google login will be available in the next update");
   };
 
   const handleForgotPassword = () => {
     // TODO: Implement forgot password
-    Alert.alert('Coming Soon', 'Password reset will be available soon');
+    showErrorAlert("Feature Coming Soon", "Password reset will be available in the next update");
   };
 
   return (
     <SafeAreaView className="flex-1 bg-white">
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         className="flex-1"
       >
         <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
@@ -76,13 +115,9 @@ export default function StudentLoginScreen() {
               <View className="w-20 h-20 bg-black rounded-2xl items-center justify-center mb-6">
                 <Ionicons name="school" size={40} color="white" />
               </View>
-              
-              <Text className="text-2xl font-bold text-black mb-2">
-                Welcome Back 👋
-              </Text>
-              <Text className="text-gray-600 text-center">
-                Please enter your details.
-              </Text>
+
+              <Text className="text-2xl font-bold text-black mb-2">Welcome Back 👋</Text>
+              <Text className="text-gray-600 text-center">Please enter your details.</Text>
             </View>
 
             {/* Google Login Button */}
@@ -92,9 +127,7 @@ export default function StudentLoginScreen() {
               activeOpacity={0.8}
             >
               <Ionicons name="logo-google" size={20} color="#4285F4" />
-              <Text className="ml-3 text-gray-700 font-medium">
-                Log in with Google
-              </Text>
+              <Text className="ml-3 text-gray-700 font-medium">Log in with Google</Text>
             </TouchableOpacity>
 
             {/* Divider */}
@@ -137,11 +170,7 @@ export default function StudentLoginScreen() {
                     onPress={() => setShowPassword(!showPassword)}
                     className="absolute right-4 top-3"
                   >
-                    <Ionicons 
-                      name={showPassword ? "eye-off" : "eye"} 
-                      size={20} 
-                      color="#6b7280" 
-                    />
+                    <Ionicons name={showPassword ? "eye-off" : "eye"} size={20} color="#6b7280" />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -152,20 +181,18 @@ export default function StudentLoginScreen() {
                   onPress={() => setRememberMe(!rememberMe)}
                   className="flex-row items-center"
                 >
-                  <View className={`w-5 h-5 rounded border-2 mr-2 items-center justify-center ${
-                    rememberMe ? 'bg-black border-black' : 'border-gray-300'
-                  }`}>
-                    {rememberMe && (
-                      <Ionicons name="checkmark" size={12} color="white" />
-                    )}
+                  <View
+                    className={`w-5 h-5 rounded border-2 mr-2 items-center justify-center ${
+                      rememberMe ? "bg-black border-black" : "border-gray-300"
+                    }`}
+                  >
+                    {rememberMe && <Ionicons name="checkmark" size={12} color="white" />}
                   </View>
                   <Text className="text-black">Remember me</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity onPress={handleForgotPassword}>
-                  <Text className="text-black font-medium">
-                    Forgot password?
-                  </Text>
+                  <Text className="text-black font-medium">Forgot password?</Text>
                 </TouchableOpacity>
               </View>
 
@@ -174,12 +201,12 @@ export default function StudentLoginScreen() {
                 onPress={handleLogin}
                 disabled={isLoading}
                 className={`rounded-xl py-4 items-center mt-6 border-2 ${
-                  isLoading ? 'bg-gray-400 border-gray-400' : 'bg-black border-black'
+                  isLoading ? "bg-gray-400 border-gray-400" : "bg-black border-black"
                 }`}
                 activeOpacity={0.8}
               >
                 <Text className="text-white font-semibold text-lg">
-                  {isLoading ? 'Logging in...' : 'Login'}
+                  {isLoading ? "Logging in..." : "Login"}
                 </Text>
               </TouchableOpacity>
 
