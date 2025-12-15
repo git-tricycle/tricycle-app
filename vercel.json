@@ -5,7 +5,19 @@
     "installCommand": "npm install",
     "rewrites": [
         {
-            "source": "/(.*)",
+            "source": "/static/(.*)",
+            "destination": "/static/$1"
+        },
+        {
+            "source": "/assets/(.*)",
+            "destination": "/assets/$1"
+        },
+        {
+            "source": "/_expo/(.*)",
+            "destination": "/_expo/$1"
+        },
+        {
+            "source": "/(?!.*\\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|json|xml|txt|map)$).*",
             "destination": "/index.html"
         }
     ],
@@ -20,6 +32,28 @@
                 {
                     "key": "Service-Worker-Allowed",
                     "value": "/"
+                },
+                {
+                    "key": "Content-Type",
+                    "value": "application/javascript"
+                }
+            ]
+        },
+        {
+            "source": "/**/*.js",
+            "headers": [
+                {
+                    "key": "Content-Type",
+                    "value": "application/javascript"
+                }
+            ]
+        },
+        {
+            "source": "/**/*.css",
+            "headers": [
+                {
+                    "key": "Content-Type",
+                    "value": "text/css"
                 }
             ]
         },
