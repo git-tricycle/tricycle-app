@@ -3,15 +3,7 @@ const CACHE_NAME = "tricycle-app-v1.0.0";
 const OFFLINE_URL = "/offline.html";
 
 // URLs to cache for offline functionality
-const urlsToCache = [
-  "/",
-  "/static/js/bundle.js",
-  "/static/css/main.css",
-  "/manifest.json",
-  "/icon-192.png",
-  "/icon-512.png",
-  OFFLINE_URL,
-];
+const urlsToCache = ["/", "/manifest.json", "/icon-192.png", "/icon-512.png", OFFLINE_URL];
 
 // Install event - cache resources
 self.addEventListener("install", (event) => {
