@@ -3,15 +3,31 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import "react-native-reanimated";
 import "../global.css";
+import { View, Text } from "react-native";
 
 import { useColorScheme } from "@/src/hooks/use-color-scheme";
 import { AuthProvider } from "@/src/contexts/AuthContext";
 
-// Keep the splash screen visible while we fetch resources
-SplashScreen.preventAutoHideAsync();
+console.log("🚀 App starting...");
+
+// Safely hide splash screen
+const hideSplash = async () => {
+  try {
+    await SplashScreen.hideAsync();
+  } catch (e) {
+    console.log("Splash screen already hidden");
+  }
+};
+
+// Prevent auto-hide
+try {
+  SplashScreen.preventAutoHideAsync().catch(() => {});
+} catch (e) {
+  console.log("Could not prevent auto hide");
+}
 
 export const unstable_settings = {
   initialRouteName: "(onboarding)",
@@ -19,8 +35,6 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
-
-  // Load Poppins fonts from local files
   const [fontsLoaded] = useFonts({
     "Poppins-Light": require("@/assets/fonts/Poppins-Light.ttf"),
     "Poppins-Regular": require("@/assets/fonts/Poppins-Regular.ttf"),
@@ -32,14 +46,18 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    if (fontsLoaded) {
-      SplashScreen.hideAsync();
-    }
-  }, [fontsLoaded]);
+    // Hide splash when fonts are ready OR after 1 second (whichever comes first)
+    const timer = setTimeout(() => {
+      hideSplash();
+    }, 1000);
 
-  if (!fontsLoaded) {
-    return null;
-  }
+    if (fontsLoaded) {
+      hideSplash();
+      clearTimeout(timer);
+    }
+
+    return () => clearTimeout(timer);
+  }, [fontsLoaded]);
 
   return (
     <AuthProvider>
