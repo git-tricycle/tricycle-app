@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   TextInput,
   RefreshControl,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -16,6 +17,47 @@ import * as ImagePicker from "expo-image-picker";
 import { useAuth } from "@/src/contexts/AuthContext";
 import { studentService, type Student } from "@/src/services/student.service";
 import { userService } from "@/src/services/user.service";
+import { PWAInstallButton } from "@/src/components/PWAPrompt";
+
+// Web compatibility utilities
+const showAlert = (title: string, message?: string) => {
+  if (Platform.OS === "web") {
+    window.alert(`${title}${message ? `\n${message}` : ""}`);
+  } else {
+    Alert.alert(title, message);
+  }
+};
+
+const showConfirm = (
+  title: string,
+  message: string,
+  onConfirm: () => void,
+  onCancel?: () => void
+) => {
+  if (Platform.OS === "web") {
+    if (window.confirm(`${title}\n${message}`)) {
+      onConfirm();
+    } else if (onCancel) {
+      onCancel();
+    }
+  } else {
+    Alert.alert(title, message, [
+      { text: "Cancel", style: "cancel", onPress: onCancel },
+      { text: "OK", onPress: onConfirm },
+    ]);
+  }
+};
+
+// Web-compatible TouchableOpacity styling
+const getWebButtonStyle = (className: string) => {
+  if (Platform.OS === "web") {
+    return {
+      className,
+      style: { cursor: "pointer" as any },
+    };
+  }
+  return { className };
+};
 
 export default function StudentProfileScreen() {
   const { user, logout } = useAuth();
@@ -89,37 +131,31 @@ export default function StudentProfileScreen() {
           console.log("Student profile not found in user data");
           setStudentProfile(null);
 
-          Alert.alert(
+          showConfirm(
             "Student Profile Required",
             "You need to create a student profile to access this feature. Would you like to create one now?",
-            [
-              { text: "Later", style: "cancel" },
-              {
-                text: "Create Profile",
-                onPress: () => {
-                  setIsEditing(true);
-                  setEditableData({
-                    studentId: "",
-                    course: "",
-                    yearLevel: "",
-                    schoolEmail: "",
-                    emergencyContactName: "",
-                    emergencyContactNumber: "",
-                    dateOfBirth: "",
-                  });
-                },
-              },
-            ]
+            () => {
+              setIsEditing(true);
+              setEditableData({
+                studentId: "",
+                course: "",
+                yearLevel: "",
+                schoolEmail: "",
+                emergencyContactName: "",
+                emergencyContactNumber: "",
+                dateOfBirth: "",
+              });
+            }
           );
         }
       } else {
         console.log("Failed to load user data:", userResponse.message);
-        Alert.alert("Error", "Failed to load profile data. Please try again.");
+        showAlert("Error", "Failed to load profile data. Please try again.");
       }
     } catch (error) {
       console.error("Error loading profile data:", error);
       if (error instanceof Error && error.message.includes("Network")) {
-        Alert.alert("Connection Error", "Please check your internet connection and try again.");
+        showAlert("Connection Error", "Please check your internet connection and try again.");
       }
     } finally {
       setIsRefreshing(false);
@@ -167,16 +203,16 @@ export default function StudentProfileScreen() {
           setStudentProfile(response.data || null);
         }
         setIsEditing(false);
-        Alert.alert(
+        showAlert(
           "Success",
           studentProfile ? "Profile updated successfully!" : "Profile created successfully!"
         );
       } else {
-        Alert.alert("Error", response.message || "Failed to save profile");
+        showAlert("Error", response.message || "Failed to save profile");
       }
     } catch (error) {
       console.error("Error saving profile:", error);
-      Alert.alert("Error", "Failed to save profile. Please try again.");
+      showAlert("Error", "Failed to save profile. Please try again.");
     } finally {
       setIsUpdating(false);
     }
@@ -213,13 +249,13 @@ export default function StudentProfileScreen() {
       if (response.success) {
         setStudentProfile({ ...studentProfile, ...emergencyContactData });
         setIsEditingEmergencyContact(false);
-        Alert.alert("Success", "Emergency contact updated successfully!");
+        showAlert("Success", "Emergency contact updated successfully!");
       } else {
-        Alert.alert("Error", response.message || "Failed to update emergency contact");
+        showAlert("Error", response.message || "Failed to update emergency contact");
       }
     } catch (error) {
       console.error("Error updating emergency contact:", error);
-      Alert.alert("Error", "Failed to update emergency contact. Please try again.");
+      showAlert("Error", "Failed to update emergency contact. Please try again.");
     } finally {
       setIsUpdating(false);
     }
@@ -237,14 +273,14 @@ export default function StudentProfileScreen() {
   const handleUploadStudentID = async () => {
     // Create student profile if it doesn't exist
     if (!studentProfile?.id) {
-      Alert.alert("Info", "Creating student profile first...");
+      showAlert("Info", "Creating student profile first...");
       // You can either create the profile here or skip this check
     }
 
     try {
       const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permissionResult.granted) {
-        Alert.alert(
+        showAlert(
           "Permission Required",
           "Please grant camera roll permissions to upload documents"
         );
@@ -270,11 +306,26 @@ export default function StudentProfileScreen() {
         const match = /\.(\w+)$/.exec(filename);
         const type = match ? `image/${match[1]}` : "image/jpeg";
 
-        formData.append("studentIdPhoto", {
-          uri: fileUri,
-          type: type,
-          name: filename,
-        } as any);
+        if (Platform.OS === "web") {
+          // On web, fetch the blob from the URI and append it
+          try {
+            const fetchResponse = await fetch(fileUri);
+            const blob = await fetchResponse.blob();
+            formData.append("studentIdPhoto", blob, filename);
+          } catch (fetchError) {
+            console.error("Error fetching image blob:", fetchError);
+            showAlert("Error", "Failed to process image. Please try again.");
+            setIsUploadingDocument(false);
+            return;
+          }
+        } else {
+          // On native, use the URI approach
+          formData.append("studentIdPhoto", {
+            uri: fileUri,
+            type: type,
+            name: filename,
+          } as any);
+        }
 
         if (studentProfile?.id) {
           const response = await studentService.uploadStudentIDPhoto(studentProfile.id, formData);
@@ -284,15 +335,15 @@ export default function StudentProfileScreen() {
             const updatedStudent = response.data.student;
             setStudentProfile(updatedStudent);
 
-            Alert.alert("Success", "Student ID photo uploaded successfully!");
+            showAlert("Success", "Student ID photo uploaded successfully!");
 
             // Refresh the profile data to get latest state
             await loadProfileData();
           } else {
-            Alert.alert("Error", response.message || "Failed to upload student ID photo");
+            showAlert("Error", response.message || "Failed to upload student ID photo");
           }
         } else {
-          Alert.alert(
+          showAlert(
             "Error",
             "Please create your student profile first by filling out the Student Information section"
           );
@@ -300,7 +351,7 @@ export default function StudentProfileScreen() {
       }
     } catch (error) {
       console.error("Error uploading student ID:", error);
-      Alert.alert("Error", "Failed to upload student ID photo. Please try again.");
+      showAlert("Error", "Failed to upload student ID photo. Please try again.");
     } finally {
       setIsUploadingDocument(false);
     }
@@ -311,53 +362,39 @@ export default function StudentProfileScreen() {
       return;
     }
 
-    Alert.alert(
+    showConfirm(
       "Delete Student ID",
       "Are you sure you want to delete your student ID photo? This will require re-verification.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              setIsUploadingDocument(true);
+      async () => {
+        try {
+          setIsUploadingDocument(true);
 
-              const response = await studentService.deleteStudentIDPhoto(studentProfile.id);
+          const response = await studentService.deleteStudentIDPhoto(studentProfile.id);
 
-              if (response.success && response.data) {
-                setStudentProfile(response.data);
-                Alert.alert("Success", "Student ID photo deleted successfully");
+          if (response.success && response.data) {
+            setStudentProfile(response.data);
+            showAlert("Success", "Student ID photo deleted successfully");
 
-                // Refresh the profile data
-                await loadProfileData();
-              } else {
-                Alert.alert("Error", response.message || "Failed to delete student ID photo");
-              }
-            } catch (error) {
-              console.error("Error deleting student ID:", error);
-              Alert.alert("Error", "Failed to delete student ID photo. Please try again.");
-            } finally {
-              setIsUploadingDocument(false);
-            }
-          },
-        },
-      ]
+            // Refresh the profile data
+            await loadProfileData();
+          } else {
+            showAlert("Error", response.message || "Failed to delete student ID photo");
+          }
+        } catch (error) {
+          console.error("Error deleting student ID:", error);
+          showAlert("Error", "Failed to delete student ID photo. Please try again.");
+        } finally {
+          setIsUploadingDocument(false);
+        }
+      }
     );
   };
 
   const handleLogout = () => {
-    Alert.alert("Confirm Logout", "Are you sure you want to logout?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Logout",
-        style: "destructive",
-        onPress: async () => {
-          await logout();
-          router.replace("/(onboarding)/welcome");
-        },
-      },
-    ]);
+    showConfirm("Confirm Logout", "Are you sure you want to logout?", async () => {
+      await logout();
+      router.replace("/(onboarding)/welcome");
+    });
   };
 
   const renderProfileField = (
@@ -437,13 +474,13 @@ export default function StudentProfileScreen() {
       {/* Header */}
       <View className="bg-black px-6 py-4 flex-row items-center justify-between">
         <View className="flex-row items-center">
-          <TouchableOpacity onPress={() => router.back()} className="mr-4">
+          <TouchableOpacity onPress={() => router.back()} {...getWebButtonStyle("mr-4")}>
             <Ionicons name="arrow-back" size={24} color="white" />
           </TouchableOpacity>
           <Text className="text-white text-lg font-semibold">Profile</Text>
         </View>
 
-        <TouchableOpacity onPress={handleLogout} className="flex-row items-center">
+        <TouchableOpacity onPress={handleLogout} {...getWebButtonStyle("flex-row items-center")}>
           <Ionicons name="log-out" size={20} color="white" />
           <Text className="text-white ml-2">Logout</Text>
         </TouchableOpacity>
@@ -689,6 +726,8 @@ export default function StudentProfileScreen() {
         {/* Account Settings */}
         <View className="bg-white mx-6 mt-6 mb-6 rounded-2xl p-6 shadow-sm">
           <Text className="text-black text-lg font-semibold mb-4">Account Settings</Text>
+
+          {Platform.OS === "web" && <PWAInstallButton />}
 
           <TouchableOpacity className="flex-row items-center justify-between p-4 border-b border-gray-100">
             <View className="flex-row items-center">

@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React from "react";
-import { Text, TouchableOpacity, View, Image } from "react-native";
+import { Text, TouchableOpacity, View, Image, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function Slide3Screen() {
@@ -38,18 +38,29 @@ export default function Slide3Screen() {
         <View className="w-80 h-80 bg-gray-100 rounded-3xl items-center justify-center mb-12">
           <View className="items-center">
             <View className="items-center">
-              <Image source={require("@/assets/images/Privacy.png")} className="w-80 h-80" resizeMode="contain" />
+              <Image
+                source={require("@/assets/images/Privacy.png")}
+                style={{
+                  width: 320,
+                  height: 320,
+                  maxWidth: "100%",
+                  maxHeight: "100%",
+                }}
+                resizeMode="contain"
+              />
             </View>
           </View>
         </View>
 
         {/* Title */}
-        <Text className="text-3xl font-bold text-black text-center mb-6">Safe & Reliable Service</Text>
+        <Text className="text-3xl font-bold text-black text-center mb-6">
+          Safe & Reliable Service
+        </Text>
 
         {/* Description */}
         <Text className="text-lg text-gray-600 text-center leading-7 mb-12">
-          All our drivers are verified and rated by the community. Track your ride in real-time and enjoy peace of mind
-          with every journey.
+          All our drivers are verified and rated by the community. Track your ride in real-time and
+          enjoy peace of mind with every journey.
         </Text>
       </View>
 

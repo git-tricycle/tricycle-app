@@ -130,18 +130,58 @@ export class ApiClient {
         }
       }
 
-      const headers = await this.getHeaders();
+      // Handle headers conditionally for FormData
+      let requestHeaders: Record<string, string>;
+      if (fetchOptions.body instanceof FormData) {
+        // For FormData, only use auth header, let browser set Content-Type
+        const token = await this.getToken();
+        requestHeaders = {};
+        if (token) {
+          requestHeaders.Authorization = `Bearer ${token}`;
+        }
+        // Merge any additional headers except Content-Type
+        if (fetchOptions.headers) {
+          if (fetchOptions.headers instanceof Headers) {
+            fetchOptions.headers.forEach((value, key) => {
+              if (key.toLowerCase() !== "content-type") {
+                requestHeaders[key] = value;
+              }
+            });
+          } else {
+            Object.entries(fetchOptions.headers as Record<string, string>).forEach(
+              ([key, value]) => {
+                if (key.toLowerCase() !== "content-type") {
+                  requestHeaders[key] = value;
+                }
+              }
+            );
+          }
+        }
+      } else {
+        // For regular requests, use default headers
+        const headers = await this.getHeaders();
+        const additionalHeaders: Record<string, string> = {};
+
+        if (fetchOptions.headers) {
+          if (fetchOptions.headers instanceof Headers) {
+            fetchOptions.headers.forEach((value, key) => {
+              additionalHeaders[key] = value;
+            });
+          } else {
+            Object.assign(additionalHeaders, fetchOptions.headers);
+          }
+        }
+
+        requestHeaders = { ...headers, ...additionalHeaders };
+      }
 
       console.log("Making API request to:", url);
-      console.log("Request headers:", { ...headers, ...fetchOptions.headers });
+      console.log("Request headers:", requestHeaders);
       console.log("Request body:", fetchOptions.body);
 
       const response = await fetch(url, {
         ...fetchOptions,
-        headers: {
-          ...headers,
-          ...fetchOptions.headers,
-        },
+        headers: requestHeaders,
       });
 
       const serializedHeaders = serializeHeaders(response.headers);

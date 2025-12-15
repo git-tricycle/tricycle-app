@@ -1,5 +1,5 @@
-import React, { useRef, useImperativeHandle, forwardRef } from "react";
-import { View } from "react-native";
+import React, { useRef, useImperativeHandle, forwardRef, useEffect } from "react";
+import { View, Platform } from "react-native";
 import { WebView } from "react-native-webview";
 
 export interface Location {
@@ -310,6 +310,191 @@ const MapView = forwardRef<MapViewRef, MapViewProps>(
     `;
     };
 
+    // Web implementation using Leaflet
+    if (Platform.OS === "web") {
+      const mapId = `map-${Math.random().toString(36).substr(2, 9)}`;
+      const mapRef = useRef<any>(null);
+
+      useEffect(() => {
+        let map: any = null;
+
+        const initMap = async () => {
+          // Load Leaflet CSS
+          if (!document.getElementById("leaflet-css")) {
+            const css = document.createElement("link");
+            css.id = "leaflet-css";
+            css.rel = "stylesheet";
+            css.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+            css.integrity = "sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=";
+            css.crossOrigin = "";
+            document.head.appendChild(css);
+          }
+
+          // Load Leaflet JS
+          if (!(window as any).L) {
+            return new Promise<void>((resolve) => {
+              const script = document.createElement("script");
+              script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+              script.integrity = "sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=";
+              script.crossOrigin = "";
+              script.onload = () => {
+                setTimeout(() => {
+                  createMap();
+                  resolve();
+                }, 100);
+              };
+              document.head.appendChild(script);
+            });
+          } else {
+            createMap();
+          }
+        };
+
+        const createMap = () => {
+          const mapElement = document.getElementById(mapId);
+          if (!mapElement || !(window as any).L) return;
+
+          try {
+            map = (window as any).L.map(mapId, {
+              zoomControl: true,
+              attributionControl: true,
+            }).setView([center.latitude, center.longitude], 15);
+
+            // Add tile layer
+            (window as any).L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+              attribution: "© OpenStreetMap contributors",
+              maxZoom: 19,
+            }).addTo(map);
+
+            // Add click handler for location selection
+            if (interactive && onLocationSelect) {
+              map.on("click", (e: any) => {
+                const location = {
+                  latitude: e.latlng.lat,
+                  longitude: e.latlng.lng,
+                };
+                onLocationSelect(location);
+              });
+            }
+
+            // Add markers
+            markers.forEach((marker) => {
+              let leafletMarker;
+
+              if (marker.icon) {
+                const icon = (window as any).L.icon({
+                  iconUrl: marker.icon,
+                  iconSize: [32, 32],
+                  iconAnchor: [16, 32],
+                  popupAnchor: [0, -32],
+                });
+                leafletMarker = (window as any).L.marker(
+                  [marker.location.latitude, marker.location.longitude],
+                  { icon }
+                ).addTo(map);
+              } else {
+                leafletMarker = (window as any).L.marker([
+                  marker.location.latitude,
+                  marker.location.longitude,
+                ]).addTo(map);
+              }
+
+              if (marker.title) {
+                leafletMarker.bindPopup(marker.title);
+              }
+
+              if (onMarkerPress) {
+                leafletMarker.on("click", () => {
+                  onMarkerPress(marker.id);
+                });
+              }
+            });
+
+            // Add polylines
+            polylines.forEach((polyline) => {
+              const latlngs = polyline.path.map((point) => [point.latitude, point.longitude]);
+              (window as any).L.polyline(latlngs, {
+                color: polyline.color || "#3388ff",
+                weight: polyline.weight || 3,
+                opacity: 0.8,
+              }).addTo(map);
+            });
+
+            mapRef.current = map;
+          } catch (error) {
+            console.error("Error creating map:", error);
+          }
+        };
+
+        initMap();
+
+        return () => {
+          if (map) {
+            map.remove();
+          }
+        };
+      }, [mapId, center.latitude, center.longitude]);
+
+      // Update markers when they change
+      useEffect(() => {
+        if (mapRef.current && (window as any).L) {
+          // Clear existing markers and add new ones
+          // This is a simplified approach - in production you'd want more sophisticated marker management
+          mapRef.current.eachLayer((layer: any) => {
+            if (layer instanceof (window as any).L.Marker) {
+              mapRef.current.removeLayer(layer);
+            }
+          });
+
+          markers.forEach((marker) => {
+            let leafletMarker;
+
+            if (marker.icon) {
+              const icon = (window as any).L.icon({
+                iconUrl: marker.icon,
+                iconSize: [32, 32],
+                iconAnchor: [16, 32],
+                popupAnchor: [0, -32],
+              });
+              leafletMarker = (window as any).L.marker(
+                [marker.location.latitude, marker.location.longitude],
+                { icon }
+              ).addTo(mapRef.current);
+            } else {
+              leafletMarker = (window as any).L.marker([
+                marker.location.latitude,
+                marker.location.longitude,
+              ]).addTo(mapRef.current);
+            }
+
+            if (marker.title) {
+              leafletMarker.bindPopup(marker.title);
+            }
+
+            if (onMarkerPress) {
+              leafletMarker.on("click", () => {
+                onMarkerPress(marker.id);
+              });
+            }
+          });
+        }
+      }, [markers]);
+
+      return (
+        <View className={`rounded-xl overflow-hidden ${className}`} style={{ height }}>
+          <div
+            id={mapId}
+            style={{
+              width: "100%",
+              height: "100%",
+              borderRadius: 12,
+            }}
+          />
+        </View>
+      );
+    }
+
+    // Native implementation using WebView
     return (
       <View className={`rounded-xl overflow-hidden ${className}`} style={{ height }}>
         <WebView

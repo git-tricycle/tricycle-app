@@ -1,3 +1,4 @@
+import { Platform } from "react-native";
 import { apiClient, ApiResponse, SearchParams } from "./api.client";
 
 // Vehicle Types matching API schema
@@ -188,13 +189,17 @@ class VehicleService {
       }
     }
 
-    // Override content type for multipart form data
+    // Set Content-Type conditionally based on platform
+    const headers: Record<string, string> = {};
+    if (Platform.OS !== "web") {
+      headers["Content-Type"] = "multipart/form-data";
+    }
+    // On web, let browser set Content-Type automatically for proper boundary
+
     return apiClient.request<any>(`/vehicle/${vehicleId}/upload-documents`, {
       method: "POST",
       body: formData,
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+      headers,
     });
   }
 

@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Modal,
   Image,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -33,13 +34,23 @@ export default function RideRequestsScreen() {
   const [processingRideId, setProcessingRideId] = useState<string | null>(null);
   const [activeRide, setActiveRide] = useState<Ride | null>(null);
   const [isActiveRideVisible, setIsActiveRideVisible] = useState(false);
+
+  const showAlert = (title: string, message: string) => {
+    if (Platform.OS === "web") {
+      alert(`${title}: ${message}`);
+    } else {
+      Alert.alert(title, message);
+    }
+  };
   const [driverLocation, setDriverLocation] = useState<Location | null>(null);
   const [isRideStatusUpdating, setIsRideStatusUpdating] = useState(false);
   const locationWatcher = useRef<ExpoLocation.LocationSubscription | null>(null);
-  const motorbikeIcon = useMemo(
-    () => Image.resolveAssetSource(require("@/assets/images/motorbike.png")).uri,
-    []
-  );
+  const motorbikeIcon = useMemo(() => {
+    if (Platform.OS === "web") {
+      return require("@/assets/images/motorbike.png");
+    }
+    return Image.resolveAssetSource(require("@/assets/images/motorbike.png")).uri;
+  }, []);
   const [routePolylines, setRoutePolylines] = useState<MapPolyline[]>([]);
   const lastRouteKeyRef = useRef<string | null>(null);
   const [newRideNotification, setNewRideNotification] = useState<RideRequest | null>(null);
@@ -68,15 +79,21 @@ export default function RideRequestsScreen() {
             if (response.data.status === "cancelled" && activeRide.status !== "cancelled") {
               setActiveRide(response.data);
               setIsActiveRideVisible(false);
-              Alert.alert("Ride Cancelled", "The passenger has cancelled this ride request.", [
-                {
-                  text: "OK",
-                  onPress: () => {
-                    setActiveRide(null);
-                    loadRideRequests(false); // Refresh the list
+              if (Platform.OS === "web") {
+                alert("Ride Cancelled: The passenger has cancelled this ride request.");
+                setActiveRide(null);
+                loadRideRequests(false); // Refresh the list
+              } else {
+                Alert.alert("Ride Cancelled", "The passenger has cancelled this ride request.", [
+                  {
+                    text: "OK",
+                    onPress: () => {
+                      setActiveRide(null);
+                      loadRideRequests(false); // Refresh the list
+                    },
                   },
-                },
-              ]);
+                ]);
+              }
             }
           }
         } catch (error) {
@@ -151,7 +168,7 @@ export default function RideRequestsScreen() {
       }
     } catch (error) {
       console.error("Error loading ride requests:", error);
-      Alert.alert("Error", "Failed to load ride requests. Please try again.");
+      showAlert("Error", "Failed to load ride requests. Please try again.");
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -160,38 +177,54 @@ export default function RideRequestsScreen() {
 
   const handleAcceptRide = async (rideId: string) => {
     if (!user?.id) {
-      Alert.alert("Error", "User not authenticated");
+      showAlert("Error", "User not authenticated");
       return;
     }
 
-    Alert.alert("Accept Ride", "Are you sure you want to accept this ride request?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Accept",
-        onPress: async () => {
-          try {
-            setProcessingRideId(rideId);
+    const performAccept = async () => {
+      try {
+        setProcessingRideId(rideId);
 
-            const response = await rideService.acceptRide(rideId, user.id);
+        const response = await rideService.acceptRide(rideId, user.id);
 
-            if (response.success && response.data) {
-              // Remove accepted ride from list
-              setRideRequests((prev) => prev.filter((ride) => ride.id !== rideId));
-              setActiveRide(response.data);
-              await loadDriverLocation();
-              setIsActiveRideVisible(true);
-            } else {
-              Alert.alert("Error", response.message || "Failed to accept ride");
-            }
-          } catch (error) {
-            console.error("Error accepting ride:", error);
-            Alert.alert("Error", "Failed to accept ride. Please try again.");
-          } finally {
-            setProcessingRideId(null);
+        if (response.success && response.data) {
+          // Remove accepted ride from list
+          setRideRequests((prev) => prev.filter((ride) => ride.id !== rideId));
+          setActiveRide(response.data);
+          await loadDriverLocation();
+          setIsActiveRideVisible(true);
+
+          // Web platform notification
+          if (Platform.OS === "web") {
+            console.log(
+              "Ride accepted successfully on web platform. Note: Real-time location tracking is not available on web."
+            );
           }
+        } else {
+          showAlert("Error", response.message || "Failed to accept ride");
+        }
+      } catch (error) {
+        console.error("Error accepting ride:", error);
+        showAlert("Error", "Failed to accept ride. Please try again.");
+      } finally {
+        setProcessingRideId(null);
+      }
+    };
+
+    if (Platform.OS === "web") {
+      const confirmed = confirm("Are you sure you want to accept this ride request?");
+      if (confirmed) {
+        performAccept();
+      }
+    } else {
+      Alert.alert("Accept Ride", "Are you sure you want to accept this ride request?", [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Accept",
+          onPress: performAccept,
         },
-      },
-    ]);
+      ]);
+    }
   };
 
   const loadDriverLocation = async () => {
@@ -226,9 +259,18 @@ export default function RideRequestsScreen() {
   };
 
   const stopLocationWatcher = () => {
+    if (Platform.OS === "web") {
+      // Location tracking not supported on web
+      return;
+    }
     if (locationWatcher.current) {
-      locationWatcher.current.remove();
-      locationWatcher.current = null;
+      try {
+        locationWatcher.current.remove();
+        locationWatcher.current = null;
+      } catch (error) {
+        console.error("Error removing location watcher:", error);
+        locationWatcher.current = null;
+      }
     }
   };
 
@@ -343,7 +385,7 @@ export default function RideRequestsScreen() {
       activeRide &&
       (activeRide.status === "accepted" || activeRide.status === "in_progress");
 
-    if (!shouldTrackLocation) {
+    if (!shouldTrackLocation || Platform.OS === "web") {
       stopLocationWatcher();
       return;
     }
@@ -354,7 +396,7 @@ export default function RideRequestsScreen() {
       try {
         const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
         if (status !== "granted") {
-          Alert.alert(
+          showAlert(
             "Location Permission Required",
             "Please enable location access so passengers can track you in real time."
           );
@@ -432,17 +474,17 @@ export default function RideRequestsScreen() {
 
       if (response?.success && response.data) {
         setActiveRide(response.data);
-        Alert.alert("Success", successMessage);
+        showAlert("Success", successMessage);
         if (action === "complete" || action === "cancel") {
           setIsActiveRideVisible(false);
           setActiveRide(null);
         }
       } else if (response) {
-        Alert.alert("Error", response.message || "Unable to update ride status");
+        showAlert("Error", response.message || "Unable to update ride status");
       }
     } catch (error) {
       console.error("Failed to update ride status:", error);
-      Alert.alert("Error", "Unable to update ride status. Please try again.");
+      showAlert("Error", "Unable to update ride status. Please try again.");
     } finally {
       setIsRideStatusUpdating(false);
     }
@@ -505,7 +547,20 @@ export default function RideRequestsScreen() {
       <Modal
         visible={isActiveRideVisible}
         animationType="slide"
-        presentationStyle="fullScreen"
+        presentationStyle={Platform.OS === "web" ? undefined : "fullScreen"}
+        style={
+          Platform.OS === "web"
+            ? {
+                position: "fixed",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: "white",
+                zIndex: 1000,
+              }
+            : undefined
+        }
         onRequestClose={() => {
           setIsActiveRideVisible(false);
         }}
@@ -688,8 +743,24 @@ export default function RideRequestsScreen() {
     return (
       <Modal
         visible={isNotificationVisible}
-        transparent
+        transparent={Platform.OS !== "web"}
         animationType="slide"
+        style={
+          Platform.OS === "web"
+            ? {
+                position: "fixed",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: "rgba(0,0,0,0.4)",
+                zIndex: 1000,
+                display: "flex",
+                alignItems: "flex-end",
+                justifyContent: "flex-end",
+              }
+            : undefined
+        }
         onRequestClose={() => setIsNotificationVisible(false)}
       >
         <View className="flex-1 justify-end bg-black/40">
@@ -863,6 +934,16 @@ export default function RideRequestsScreen() {
         onPress={() => handleAcceptRide(item.id)}
         disabled={processingRideId === item.id}
         className={`rounded-xl py-3 ${processingRideId === item.id ? "bg-gray-300" : "bg-black"}`}
+        style={
+          Platform.OS === "web"
+            ? ({
+                cursor: processingRideId === item.id ? "not-allowed" : "pointer",
+                userSelect: "none",
+                outline: "none",
+              } as any)
+            : undefined
+        }
+        activeOpacity={0.8}
       >
         {processingRideId === item.id ? (
           <View className="flex-row items-center justify-center">
