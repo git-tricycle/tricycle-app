@@ -9,6 +9,7 @@ import {
   TextInput,
   RefreshControl,
   Image,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -18,6 +19,47 @@ import { useAuth } from "@/src/contexts/AuthContext";
 import { driverService, type Driver } from "@/src/services/driver.service";
 import { vehicleService, type Vehicle } from "@/src/services/vehicle.service";
 import { userService } from "@/src/services/user.service";
+import { PWAInstallButton } from "@/src/components/PWAPrompt";
+
+// Web compatibility utilities
+const showAlert = (title: string, message?: string) => {
+  if (Platform.OS === "web") {
+    window.alert(`${title}${message ? `\n${message}` : ""}`);
+  } else {
+    Alert.alert(title, message);
+  }
+};
+
+const showConfirm = (
+  title: string,
+  message: string,
+  onConfirm: () => void,
+  onCancel?: () => void
+) => {
+  if (Platform.OS === "web") {
+    if (window.confirm(`${title}\n${message}`)) {
+      onConfirm();
+    } else if (onCancel) {
+      onCancel();
+    }
+  } else {
+    Alert.alert(title, message, [
+      { text: "Cancel", style: "cancel", onPress: onCancel },
+      { text: "OK", onPress: onConfirm },
+    ]);
+  }
+};
+
+// Web-compatible TouchableOpacity styling
+const getWebButtonStyle = (className: string) => {
+  if (Platform.OS === "web") {
+    return {
+      className,
+      style: { cursor: "pointer" as any },
+    };
+  }
+  return { className };
+};
 
 export default function DriverProfileScreen() {
   const { user, logout } = useAuth();
@@ -87,30 +129,23 @@ export default function DriverProfileScreen() {
           setDriverProfile(null);
 
           // Show alert to create driver profile
-          Alert.alert(
+          showConfirm(
             "Driver Profile Required",
             "You need to create a driver profile to access this feature. Would you like to create one now?",
-            [
-              { text: "Later", style: "cancel" },
-              {
-                text: "Create Profile",
-                onPress: () => {
-                  // Navigate to profile creation or show form
-                  setIsEditing(true);
-                  setEditableData({
-                    username: "",
-                    address: "",
-                    contactNumber: "",
-                    age: "",
-                  });
-                },
-              },
-            ]
+            () => {
+              setIsEditing(true);
+              setEditableData({
+                username: "",
+                address: "",
+                contactNumber: "",
+                age: "",
+              });
+            }
           );
         }
       } else {
         console.log("Failed to load user data:", userResponse.message);
-        Alert.alert("Error", "Failed to load profile data. Please try again.");
+        showAlert("Error", "Failed to load profile data. Please try again.");
       }
 
       console.log("Vehicle API Response:", vehicleResponse);
@@ -123,7 +158,7 @@ export default function DriverProfileScreen() {
       console.error("Error loading profile data:", error);
       // Only show error for network/server issues, not missing data
       if (error instanceof Error && error.message.includes("Network")) {
-        Alert.alert("Connection Error", "Please check your internet connection and try again.");
+        showAlert("Connection Error", "Please check your internet connection and try again.");
       }
     } finally {
       setIsRefreshing(false);
@@ -163,16 +198,16 @@ export default function DriverProfileScreen() {
           setDriverProfile(response.data || null);
         }
         setIsEditing(false);
-        Alert.alert(
+        showAlert(
           "Success",
           driverProfile ? "Profile updated successfully!" : "Profile created successfully!"
         );
       } else {
-        Alert.alert("Error", response.message || "Failed to save profile");
+        showAlert("Error", response.message || "Failed to save profile");
       }
     } catch (error) {
       console.error("Error saving profile:", error);
-      Alert.alert("Error", "Failed to save profile. Please try again.");
+      showAlert("Error", "Failed to save profile. Please try again.");
     } finally {
       setIsUpdating(false);
     }
@@ -194,7 +229,7 @@ export default function DriverProfileScreen() {
       // Request permission to access media library
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert(
+        showAlert(
           "Permission Required",
           "Please grant permission to access your photos to upload documents."
         );
@@ -202,18 +237,23 @@ export default function DriverProfileScreen() {
       }
 
       // Show options for camera or library
-      Alert.alert(
-        "Upload Document",
-        `Select ${documentType === "license" ? "License Photo" : "Valid ID"}`,
-        [
-          { text: "Cancel", style: "cancel" },
-          { text: "Camera", onPress: () => openImagePicker(documentType, "camera") },
-          { text: "Photo Library", onPress: () => openImagePicker(documentType, "library") },
-        ]
-      );
+      if (Platform.OS === "web") {
+        // On web, only show library picker
+        openImagePicker(documentType, "library");
+      } else {
+        Alert.alert(
+          "Upload Document",
+          `Select ${documentType === "license" ? "License Photo" : "Valid ID"}`,
+          [
+            { text: "Cancel", style: "cancel" },
+            { text: "Camera", onPress: () => openImagePicker(documentType, "camera") },
+            { text: "Photo Library", onPress: () => openImagePicker(documentType, "library") },
+          ]
+        );
+      }
     } catch (error) {
       console.error("Error requesting permissions:", error);
-      Alert.alert("Error", "Failed to access camera/photos. Please try again.");
+      showAlert("Error", "Failed to access camera/photos. Please try again.");
     }
   };
 
@@ -228,7 +268,7 @@ export default function DriverProfileScreen() {
       if (source === "camera") {
         const { status } = await ImagePicker.requestCameraPermissionsAsync();
         if (status !== "granted") {
-          Alert.alert("Permission Required", "Please grant camera permission to take photos.");
+          showAlert("Permission Required", "Please grant camera permission to take photos.");
           return;
         }
         result = await ImagePicker.launchCameraAsync({
@@ -252,7 +292,7 @@ export default function DriverProfileScreen() {
       }
     } catch (error) {
       console.error("Error picking image:", error);
-      Alert.alert("Error", "Failed to select image. Please try again.");
+      showAlert("Error", "Failed to select image. Please try again.");
     } finally {
       setIsUploadingDocument(false);
     }
@@ -261,43 +301,64 @@ export default function DriverProfileScreen() {
   const uploadDocumentToAPI = async (documentType: "license" | "validId", imageUri: string) => {
     try {
       if (!driverProfile?.id) {
-        Alert.alert("Error", "Driver profile not found. Please try again.");
+        showAlert("Error", "Driver profile not found. Please try again.");
         return;
       }
 
       // Prepare the file object for upload
       const fileExtension = imageUri.split(".").pop() || "jpg";
       const fileName = `${documentType}_${Date.now()}.${fileExtension}`;
+      const mimeType = `image/${fileExtension === "jpg" ? "jpeg" : fileExtension}`;
 
-      const fileObject = {
-        uri: imageUri,
-        name: fileName,
-        type: `image/${fileExtension === "jpg" ? "jpeg" : fileExtension}`,
-      };
-
-      // Create the files object for the API
       const files: any = {};
-      if (documentType === "license") {
-        files.licensePhoto = fileObject;
+
+      if (Platform.OS === "web") {
+        // On web, fetch the blob and convert to File
+        try {
+          const fetchResponse = await fetch(imageUri);
+          const blob = await fetchResponse.blob();
+          // Convert blob to File object for web
+          const fileObject = new File([blob], fileName, { type: mimeType });
+
+          if (documentType === "license") {
+            files.licensePhoto = fileObject;
+          } else {
+            files.validIdPhoto = fileObject;
+          }
+        } catch (fetchError) {
+          console.error("Error processing image:", fetchError);
+          showAlert("Error", "Failed to process image. Please try again.");
+          return;
+        }
       } else {
-        files.validIdPhoto = fileObject;
+        // On native, use URI approach
+        const fileObject = {
+          uri: imageUri,
+          name: fileName,
+          type: mimeType,
+        };
+        if (documentType === "license") {
+          files.licensePhoto = fileObject;
+        } else {
+          files.validIdPhoto = fileObject;
+        }
       }
 
-      // Upload to API
-      const response = await driverService.uploadRequirements(driverProfile.id, files);
+      // Use service method for both platforms
+      const uploadResponse = await driverService.uploadRequirements(driverProfile.id, files);
 
-      if (response.success) {
+      if (uploadResponse.success) {
         // Update local state with the new data
-        if (response.data?.driver) {
+        if (uploadResponse.data?.driver) {
           setDriverProfile({
             ...driverProfile,
-            ...response.data.driver,
+            ...uploadResponse.data.driver,
           });
         }
 
         // Show success message with verification status
-        const isNowVerified = response.data?.driver?.isVerified;
-        Alert.alert(
+        const isNowVerified = uploadResponse.data?.driver?.isVerified;
+        showAlert(
           "Success",
           `${documentType === "license" ? "License photo" : "Valid ID"} uploaded successfully!${
             isNowVerified ? " Your driver profile is now verified!" : ""
@@ -307,11 +368,11 @@ export default function DriverProfileScreen() {
         // Refresh profile data to get updated verification status
         await loadProfileData();
       } else {
-        Alert.alert("Upload Failed", response.message || "Failed to upload document");
+        showAlert("Upload Failed", uploadResponse.message || "Failed to upload document");
       }
     } catch (error) {
       console.error("Error uploading document:", error);
-      Alert.alert("Error", "Failed to upload document. Please try again.");
+      showAlert("Error", "Failed to upload document. Please try again.");
     }
   };
 
@@ -320,7 +381,7 @@ export default function DriverProfileScreen() {
       // Request permission to access media library
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert(
+        showAlert(
           "Permission Required",
           "Please grant permission to access your photos to upload documents."
         );
@@ -328,18 +389,26 @@ export default function DriverProfileScreen() {
       }
 
       // Show options for camera or library
-      Alert.alert(
-        "Upload Document",
-        `Select ${documentType === "vehiclePhoto" ? "Vehicle Photo" : "OR/CR Document"}`,
-        [
-          { text: "Cancel", style: "cancel" },
-          { text: "Camera", onPress: () => openVehicleImagePicker(documentType, "camera") },
-          { text: "Photo Library", onPress: () => openVehicleImagePicker(documentType, "library") },
-        ]
-      );
+      if (Platform.OS === "web") {
+        // On web, only show library picker
+        openVehicleImagePicker(documentType, "library");
+      } else {
+        Alert.alert(
+          "Upload Document",
+          `Select ${documentType === "vehiclePhoto" ? "Vehicle Photo" : "OR/CR Document"}`,
+          [
+            { text: "Cancel", style: "cancel" },
+            { text: "Camera", onPress: () => openVehicleImagePicker(documentType, "camera") },
+            {
+              text: "Photo Library",
+              onPress: () => openVehicleImagePicker(documentType, "library"),
+            },
+          ]
+        );
+      }
     } catch (error) {
       console.error("Error requesting permissions:", error);
-      Alert.alert("Error", "Failed to access camera/photos. Please try again.");
+      showAlert("Error", "Failed to access camera/photos. Please try again.");
     }
   };
 
@@ -354,7 +423,7 @@ export default function DriverProfileScreen() {
       if (source === "camera") {
         const { status } = await ImagePicker.requestCameraPermissionsAsync();
         if (status !== "granted") {
-          Alert.alert("Permission Required", "Please grant camera permission to take photos.");
+          showAlert("Permission Required", "Please grant camera permission to take photos.");
           return;
         }
         result = await ImagePicker.launchCameraAsync({
@@ -378,7 +447,7 @@ export default function DriverProfileScreen() {
       }
     } catch (error) {
       console.error("Error picking image:", error);
-      Alert.alert("Error", "Failed to select image. Please try again.");
+      showAlert("Error", "Failed to select image. Please try again.");
     } finally {
       setIsUploadingDocument(false);
     }
@@ -390,29 +459,50 @@ export default function DriverProfileScreen() {
   ) => {
     try {
       if (!vehicle?.id) {
-        Alert.alert("Error", "Vehicle not found. Please try again.");
+        showAlert("Error", "Vehicle not found. Please try again.");
         return;
       }
 
       // Prepare the file object for upload
       const fileExtension = imageUri.split(".").pop() || "jpg";
       const fileName = `${documentType}_${Date.now()}.${fileExtension}`;
+      const mimeType = `image/${fileExtension === "jpg" ? "jpeg" : fileExtension}`;
 
-      const fileObject = {
-        uri: imageUri,
-        name: fileName,
-        type: `image/${fileExtension === "jpg" ? "jpeg" : fileExtension}`,
-      };
-
-      // Create the files object for the API
       const files: any = {};
-      if (documentType === "vehiclePhoto") {
-        files.vehiclePhoto = fileObject;
+
+      if (Platform.OS === "web") {
+        // On web, fetch the blob and convert to File
+        try {
+          const fileResponse = await fetch(imageUri);
+          const blob = await fileResponse.blob();
+          // Convert blob to File object for web
+          const fileObject = new File([blob], fileName, { type: mimeType });
+
+          if (documentType === "vehiclePhoto") {
+            files.vehiclePhoto = fileObject;
+          } else {
+            files.orCrPhoto = fileObject;
+          }
+        } catch (fetchError) {
+          console.error("Error processing image:", fetchError);
+          showAlert("Error", "Failed to process image. Please try again.");
+          return;
+        }
       } else {
-        files.orCrPhoto = fileObject;
+        // On native, use URI approach
+        const fileObject = {
+          uri: imageUri,
+          name: fileName,
+          type: mimeType,
+        };
+        if (documentType === "vehiclePhoto") {
+          files.vehiclePhoto = fileObject;
+        } else {
+          files.orCrPhoto = fileObject;
+        }
       }
 
-      // Upload to API
+      // Use service method for both platforms
       const response = await vehicleService.uploadVehicleDocuments(vehicle.id, files);
 
       if (response.success) {
@@ -424,7 +514,7 @@ export default function DriverProfileScreen() {
           });
         }
 
-        Alert.alert(
+        showAlert(
           "Success",
           `${documentType === "vehiclePhoto" ? "Vehicle photo" : "OR/CR document"} uploaded successfully!`
         );
@@ -432,134 +522,107 @@ export default function DriverProfileScreen() {
         // Refresh profile data to get updated vehicle status
         await loadProfileData();
       } else {
-        Alert.alert("Upload Failed", response.message || "Failed to upload document");
+        showAlert("Upload Failed", response.message || "Failed to upload document");
       }
     } catch (error) {
       console.error("Error uploading vehicle document:", error);
-      Alert.alert("Error", "Failed to upload document. Please try again.");
+      showAlert("Error", "Failed to upload document. Please try again.");
     }
   };
 
   const handleDeleteVehicleDocument = async (documentType: "vehiclePhoto" | "orCrPhoto") => {
     if (!vehicle?.id) {
-      Alert.alert("Error", "Vehicle not found. Please try again.");
+      showAlert("Error", "Vehicle not found. Please try again.");
       return;
     }
 
-    Alert.alert(
+    showConfirm(
       "Delete Document",
       `Are you sure you want to delete your ${documentType === "vehiclePhoto" ? "vehicle photo" : "OR/CR document"}?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              setIsUploadingDocument(true);
+      async () => {
+        try {
+          setIsUploadingDocument(true);
 
-              const response = await vehicleService.deleteVehicleDocuments(
-                vehicle.id,
-                documentType
-              );
+          const response = await vehicleService.deleteVehicleDocuments(vehicle.id, documentType);
 
-              if (response.success) {
-                // Update local state
-                if (response.data) {
-                  setVehicle({
-                    ...vehicle,
-                    ...response.data,
-                  });
-                }
-
-                Alert.alert(
-                  "Success",
-                  `${documentType === "vehiclePhoto" ? "Vehicle photo" : "OR/CR document"} deleted successfully.`
-                );
-
-                // Refresh profile data
-                await loadProfileData();
-              } else {
-                Alert.alert("Delete Failed", response.message || "Failed to delete document");
-              }
-            } catch (error) {
-              console.error("Error deleting vehicle document:", error);
-              Alert.alert("Error", "Failed to delete document. Please try again.");
-            } finally {
-              setIsUploadingDocument(false);
+          if (response.success) {
+            // Update local state
+            if (response.data) {
+              setVehicle({
+                ...vehicle,
+                ...response.data,
+              });
             }
-          },
-        },
-      ]
+
+            showAlert(
+              "Success",
+              `${documentType === "vehiclePhoto" ? "Vehicle photo" : "OR/CR document"} deleted successfully.`
+            );
+
+            // Refresh profile data
+            await loadProfileData();
+          } else {
+            showAlert("Delete Failed", response.message || "Failed to delete document");
+          }
+        } catch (error) {
+          console.error("Error deleting vehicle document:", error);
+          showAlert("Error", "Failed to delete document. Please try again.");
+        } finally {
+          setIsUploadingDocument(false);
+        }
+      }
     );
   };
 
   const handleDeleteDocument = async (documentType: "license" | "validId") => {
     if (!driverProfile?.id) {
-      Alert.alert("Error", "Driver profile not found. Please try again.");
+      showAlert("Error", "Driver profile not found. Please try again.");
       return;
     }
 
-    Alert.alert(
+    showConfirm(
       "Delete Document",
       `Are you sure you want to delete your ${documentType === "license" ? "license photo" : "valid ID"}? This will affect your verification status.`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              setIsUploadingDocument(true);
+      async () => {
+        try {
+          setIsUploadingDocument(true);
 
-              const response = await driverService.deleteRequirements(
-                driverProfile.id,
-                documentType
-              );
+          const response = await driverService.deleteRequirements(driverProfile.id, documentType);
 
-              if (response.success) {
-                // Update local state
-                if (response.data) {
-                  setDriverProfile({
-                    ...driverProfile,
-                    ...response.data,
-                  });
-                }
-
-                Alert.alert(
-                  "Success",
-                  `${documentType === "license" ? "License photo" : "Valid ID"} deleted successfully.`
-                );
-
-                // Refresh profile data
-                await loadProfileData();
-              } else {
-                Alert.alert("Delete Failed", response.message || "Failed to delete document");
-              }
-            } catch (error) {
-              console.error("Error deleting document:", error);
-              Alert.alert("Error", "Failed to delete document. Please try again.");
-            } finally {
-              setIsUploadingDocument(false);
+          if (response.success) {
+            // Update local state
+            if (response.data) {
+              setDriverProfile({
+                ...driverProfile,
+                ...response.data,
+              });
             }
-          },
-        },
-      ]
+
+            showAlert(
+              "Success",
+              `${documentType === "license" ? "License photo" : "Valid ID"} deleted successfully.`
+            );
+
+            // Refresh profile data
+            await loadProfileData();
+          } else {
+            showAlert("Delete Failed", response.message || "Failed to delete document");
+          }
+        } catch (error) {
+          console.error("Error deleting document:", error);
+          showAlert("Error", "Failed to delete document. Please try again.");
+        } finally {
+          setIsUploadingDocument(false);
+        }
+      }
     );
   };
 
   const handleLogout = () => {
-    Alert.alert("Confirm Logout", "Are you sure you want to logout?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Logout",
-        style: "destructive",
-        onPress: async () => {
-          await logout();
-          router.replace("/(onboarding)/welcome");
-        },
-      },
-    ]);
+    showConfirm("Confirm Logout", "Are you sure you want to logout?", async () => {
+      await logout();
+      router.replace("/(onboarding)/welcome");
+    });
   };
 
   const renderProfileField = (
@@ -596,13 +659,13 @@ export default function DriverProfileScreen() {
       {/* Header */}
       <View className="bg-black px-6 py-4 flex-row items-center justify-between">
         <View className="flex-row items-center">
-          <TouchableOpacity onPress={() => router.back()} className="mr-4">
+          <TouchableOpacity onPress={() => router.back()} {...getWebButtonStyle("mr-4")}>
             <Ionicons name="arrow-back" size={24} color="white" />
           </TouchableOpacity>
           <Text className="text-white text-lg font-semibold">Profile</Text>
         </View>
 
-        <TouchableOpacity onPress={handleLogout} className="flex-row items-center">
+        <TouchableOpacity onPress={handleLogout} {...getWebButtonStyle("flex-row items-center")}>
           <Ionicons name="log-out" size={20} color="white" />
           <Text className="text-white ml-2">Logout</Text>
         </TouchableOpacity>
@@ -1006,6 +1069,8 @@ export default function DriverProfileScreen() {
         {/* Account Settings */}
         <View className="bg-white mx-6 mt-6 mb-6 rounded-2xl p-6 shadow-sm">
           <Text className="text-black text-lg font-semibold mb-4">Account Settings</Text>
+
+          {Platform.OS === "web" && <PWAInstallButton />}
 
           <TouchableOpacity className="flex-row items-center justify-between p-4 border-b border-gray-100">
             <View className="flex-row items-center">

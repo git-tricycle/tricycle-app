@@ -8,6 +8,7 @@ import {
   Alert,
   Modal,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 
 interface RideRatingProps {
@@ -90,7 +91,28 @@ export default function RideRating({
   };
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" transparent={true}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle={Platform.OS === "web" ? undefined : "pageSheet"}
+      transparent={true}
+      style={
+        Platform.OS === "web"
+          ? {
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: "rgba(0,0,0,0.5)",
+              zIndex: 1000,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }
+          : undefined
+      }
+    >
       <View className="flex-1 bg-black/50 justify-end">
         <View className="bg-white rounded-t-3xl px-6 py-8">
           {/* Header */}

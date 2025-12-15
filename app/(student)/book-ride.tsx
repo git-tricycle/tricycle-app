@@ -10,6 +10,7 @@ import {
   ScrollView,
   Modal,
   Image,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import MapView, { Location, MapViewRef, MapPolyline } from "@/src/components/ui/MapView";
@@ -44,10 +45,12 @@ interface Driver {
 export default function BookRideScreen() {
   const { user } = useAuth();
   const mapRef = useRef<MapViewRef>(null);
-  const motorbikeIcon = useMemo(
-    () => Image.resolveAssetSource(require("@/assets/images/motorbike.png")).uri,
-    []
-  );
+  const motorbikeIcon = useMemo(() => {
+    if (Platform.OS === "web") {
+      return require("@/assets/images/motorbike.png");
+    }
+    return Image.resolveAssetSource(require("@/assets/images/motorbike.png")).uri;
+  }, []);
 
   // Booking state
   const [currentStep, setCurrentStep] = useState<BookingStep>("location-selection");
@@ -79,6 +82,18 @@ export default function BookRideScreen() {
     }
   }, [pickupLocation, dropoffLocation]);
 
+  // Reset to default state when component mounts (when navigating to book-ride)
+  useEffect(() => {
+    // Only reset if there's no active ongoing ride
+    if (
+      !currentRide?.id ||
+      currentRide.status === "completed" ||
+      currentRide.status === "cancelled"
+    ) {
+      resetRideState();
+    }
+  }, []); // Run only on mount
+
   // Poll ride status once a ride exists until it is completed or cancelled
   useEffect(() => {
     if (!currentRide?.id) {
@@ -104,19 +119,27 @@ export default function BookRideScreen() {
           if (response.data.status === "cancelled" && currentRide.status !== "cancelled") {
             await handleRideStatusUpdate(response.data);
             // Show cancellation alert
-            Alert.alert(
-              "Ride Cancelled",
-              "The driver has cancelled this ride. Please book another ride.",
-              [
-                {
-                  text: "OK",
-                  onPress: () => {
-                    setCurrentStep("location-selection");
-                    resetRideState();
+            if (Platform.OS === "web") {
+              alert(
+                "Ride Cancelled: The driver has cancelled this ride. Please book another ride."
+              );
+              setCurrentStep("location-selection");
+              resetRideState();
+            } else {
+              Alert.alert(
+                "Ride Cancelled",
+                "The driver has cancelled this ride. Please book another ride.",
+                [
+                  {
+                    text: "OK",
+                    onPress: () => {
+                      setCurrentStep("location-selection");
+                      resetRideState();
+                    },
                   },
-                },
-              ]
-            );
+                ]
+              );
+            }
             return;
           }
 
@@ -217,22 +240,44 @@ export default function BookRideScreen() {
   };
 
   const handleLocationSelect = (type: "pickup" | "dropoff") => {
+    console.log("handleLocationSelect called with type:", type);
     setLocationPickerType(type);
     setShowLocationPicker(true);
   };
 
   const handleLocationConfirm = (location: BookingLocation) => {
+    console.log("Location confirmed:", { type: locationPickerType, location });
     if (locationPickerType === "pickup") {
       setPickupLocation(location);
+      console.log("Set pickup location:", location);
     } else {
       setDropoffLocation(location);
+      console.log("Set dropoff location:", location);
     }
     setShowLocationPicker(false);
   };
 
+  const showAlert = (title: string, message: string) => {
+    if (Platform.OS === "web") {
+      alert(`${title}: ${message}`);
+    } else {
+      Alert.alert(title, message);
+    }
+  };
+
   const searchForDrivers = async () => {
+    console.log("searchForDrivers called", {
+      pickupLocation,
+      dropoffLocation,
+      user: !!user,
+    });
     if (!pickupLocation || !dropoffLocation || !user) {
-      Alert.alert("Error", "Please select both pickup and dropoff locations");
+      console.log("Missing required data:", {
+        hasPickup: !!pickupLocation,
+        hasDropoff: !!dropoffLocation,
+        hasUser: !!user,
+      });
+      showAlert("Error", "Please select both pickup and dropoff locations");
       return;
     }
 
@@ -277,7 +322,7 @@ export default function BookRideScreen() {
         setAvailableDrivers(drivers);
         setCurrentStep("driver-found");
       } else {
-        Alert.alert(
+        showAlert(
           "No Drivers Available",
           "Sorry, there are no available drivers in your area at the moment. Please try again later."
         );
@@ -285,7 +330,7 @@ export default function BookRideScreen() {
       }
     } catch (error) {
       console.error("Error searching for drivers:", error);
-      Alert.alert(
+      showAlert(
         "Error",
         "Failed to find available drivers. Please check your internet connection and try again."
       );
@@ -314,10 +359,10 @@ export default function BookRideScreen() {
         setCurrentStep("awaiting-driver");
         setRideStatus("Waiting for driver to accept your request...");
       } else {
-        Alert.alert("Error", response.message || "Failed to book ride");
+        showAlert("Error", response.message || "Failed to book ride");
       }
     } catch (error) {
-      Alert.alert("Error", "Failed to book ride. Please try again.");
+      showAlert("Error", "Failed to book ride. Please try again.");
       console.error("Booking error:", error);
     }
   };
@@ -337,9 +382,12 @@ export default function BookRideScreen() {
         setCurrentStep("ride-tracking");
         break;
       case "completed":
-        // Immediately redirect to dashboard without showing any message
+        // Reset state first, then redirect to dashboard
         resetRideState();
-        router.replace("/(student)/dashboard");
+        // Use setTimeout to ensure state reset is applied before navigation
+        setTimeout(() => {
+          router.replace("/(student)/dashboard");
+        }, 100);
         break;
       case "cancelled":
         setRideStatus("This ride was cancelled.");
@@ -430,29 +478,44 @@ export default function BookRideScreen() {
     setCurrentRide(null);
     setRideStatus("");
     setRoutePolylines([]);
+    setCurrentStep("location-selection");
+    setPickupLocation(null);
+    setDropoffLocation(null);
+    setEstimatedFare(null);
+    setIsSearchingDriver(false);
+    setAvailableDrivers([]);
     lastRouteKeyRef.current = null;
   }
 
   const cancelRide = () => {
-    Alert.alert("Cancel Ride", "Are you sure you want to cancel this ride?", [
-      { text: "No", style: "cancel" },
-      {
-        text: "Yes",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            if (currentRide?.id) {
-              await rideService.cancelRide(currentRide.id);
-            }
-          } catch (error) {
-            console.error("Failed to cancel ride:", error);
-          } finally {
-            setCurrentStep("location-selection");
-            resetRideState();
-          }
+    const performCancel = async () => {
+      try {
+        if (currentRide?.id) {
+          await rideService.cancelRide(currentRide.id);
+        }
+      } catch (error) {
+        console.error("Failed to cancel ride:", error);
+      } finally {
+        setCurrentStep("location-selection");
+        resetRideState();
+      }
+    };
+
+    if (Platform.OS === "web") {
+      const confirmed = confirm("Are you sure you want to cancel this ride?");
+      if (confirmed) {
+        performCancel();
+      }
+    } else {
+      Alert.alert("Cancel Ride", "Are you sure you want to cancel this ride?", [
+        { text: "No", style: "cancel" },
+        {
+          text: "Yes",
+          style: "destructive",
+          onPress: performCancel,
         },
-      },
-    ]);
+      ]);
+    }
   };
 
   const renderAwaitingDriverStep = () => (
@@ -522,6 +585,7 @@ export default function BookRideScreen() {
         <TouchableOpacity
           onPress={() => handleLocationSelect("pickup")}
           className="bg-gray-50 rounded-xl p-4 mb-3 border border-gray-200"
+          style={Platform.OS === "web" ? ({ cursor: "pointer" } as any) : undefined}
         >
           <View className="flex-row items-center">
             <View className="w-3 h-3 bg-green-500 rounded-full mr-3" />
@@ -539,6 +603,7 @@ export default function BookRideScreen() {
         <TouchableOpacity
           onPress={() => handleLocationSelect("dropoff")}
           className="bg-gray-50 rounded-xl p-4 mb-4 border border-gray-200"
+          style={Platform.OS === "web" ? ({ cursor: "pointer" } as any) : undefined}
         >
           <View className="flex-row items-center">
             <View className="w-3 h-3 bg-red-500 rounded-full mr-3" />
@@ -606,6 +671,16 @@ export default function BookRideScreen() {
             pickupLocation && dropoffLocation ? "bg-black" : "bg-gray-300"
           }`}
           disabled={!pickupLocation || !dropoffLocation}
+          style={
+            Platform.OS === "web"
+              ? ({
+                  cursor: (pickupLocation && dropoffLocation ? "pointer" : "not-allowed") as any,
+                  userSelect: "none" as any,
+                  outline: "none" as any,
+                } as any)
+              : undefined
+          }
+          activeOpacity={0.8}
         >
           <Text
             className={`text-center font-semibold ${
@@ -817,7 +892,6 @@ export default function BookRideScreen() {
               location: selectedDriver.location,
               title: selectedDriver.name,
               color: "#3b82f6",
-              icon: motorbikeIcon,
             } as const,
           ]
         : []),
@@ -968,7 +1042,24 @@ export default function BookRideScreen() {
       {currentStep === "ride-tracking" && renderRideTrackingStep()}
 
       {/* Location Picker Modal */}
-      <Modal visible={showLocationPicker} animationType="slide" presentationStyle="fullScreen">
+      <Modal
+        visible={showLocationPicker}
+        animationType="slide"
+        presentationStyle={Platform.OS === "web" ? undefined : "fullScreen"}
+        style={
+          Platform.OS === "web"
+            ? {
+                position: "fixed",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: "white",
+                zIndex: 1000,
+              }
+            : undefined
+        }
+      >
         <LocationPicker
           title={
             locationPickerType === "pickup" ? "Select Pickup Location" : "Select Dropoff Location"

@@ -1,0 +1,33 @@
+/* Web-specific styles for React Native components */
+
+/* TouchableOpacity should have pointer cursor on web */
+.touchable-opacity {
+  cursor: pointer;
+}
+
+/* Ensure images are responsive on web */
+.responsive-image {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Modal overlay styles for web */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Fix text selection on web */
+.no-select {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}

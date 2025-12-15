@@ -1,0 +1,78 @@
+{
+    "name": "Ride It! Tricycle Booking App",
+    "short_name": "Ride It!",
+    "description": "Your trusted tricycle booking companion for safe and convenient rides",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#000000",
+    "orientation": "portrait-primary",
+    "scope": "/",
+    "lang": "en",
+    "categories": [
+        "travel",
+        "transportation"
+    ],
+    "icons": [
+        {
+            "src": "/icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "/icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ],
+    "screenshots": [
+        {
+            "src": "/screenshot-wide.png",
+            "sizes": "1280x720",
+            "type": "image/png",
+            "form_factor": "wide",
+            "label": "Ride It! Dashboard"
+        },
+        {
+            "src": "/screenshot-narrow.png",
+            "sizes": "640x1136",
+            "type": "image/png",
+            "form_factor": "narrow",
+            "label": "Book a Ride"
+        }
+    ],
+    "shortcuts": [
+        {
+            "name": "Book Ride",
+            "short_name": "Book",
+            "description": "Quickly book a tricycle ride",
+            "url": "/book-ride",
+            "icons": [
+                {
+                    "src": "/icon-96.png",
+                    "sizes": "96x96"
+                }
+            ]
+        },
+        {
+            "name": "My Profile",
+            "short_name": "Profile",
+            "description": "View and edit your profile",
+            "url": "/profile",
+            "icons": [
+                {
+                    "src": "/icon-96.png",
+                    "sizes": "96x96"
+                }
+            ]
+        }
+    ],
+    "related_applications": [],
+    "prefer_related_applications": false,
+    "edge_side_panel": {},
+    "launch_handler": {
+        "client_mode": "navigate-existing"
+    }
+}

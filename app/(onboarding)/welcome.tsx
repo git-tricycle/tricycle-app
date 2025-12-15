@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import React from "react";
-import { Image, Text, TouchableOpacity, View } from "react-native";
+import { Image, Text, TouchableOpacity, View, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function WelcomeScreen() {
@@ -16,9 +16,17 @@ export default function WelcomeScreen() {
           <View className="w-32 h-32 bg-black rounded-full items-center justify-center mb-8">
             <Image
               source={require("@/assets/images/tricycle-logo.gif")}
-              className="w-24 h-24"
+              style={{
+                width: 80,
+                height: 80,
+                tintColor: "white",
+                maxWidth: "100%",
+                maxHeight: "100%",
+                ...(Platform.OS === "web" && {
+                  filter: "grayscale(100%)",
+                }),
+              }}
               resizeMode="contain"
-              tintColor="white"
             />
           </View>
 

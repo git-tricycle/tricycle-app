@@ -1,33 +1,67 @@
 import React from "react";
-import { View, Text, ScrollView, TouchableOpacity, Alert } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, Alert, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { useAuth } from "@/src/contexts/AuthContext";
 import { Colors } from "@/src/constants/theme";
+import { PWAInstallButton } from "@/src/components/PWAPrompt";
+
+// Web compatibility utilities
+const showAlert = (title: string, message?: string) => {
+  if (Platform.OS === "web") {
+    window.alert(`${title}${message ? `\n${message}` : ""}`);
+  } else {
+    Alert.alert(title, message);
+  }
+};
+
+const showConfirm = (
+  title: string,
+  message: string,
+  onConfirm: () => void,
+  onCancel?: () => void
+) => {
+  if (Platform.OS === "web") {
+    if (window.confirm(`${title}\n${message}`)) {
+      onConfirm();
+    } else if (onCancel) {
+      onCancel();
+    }
+  } else {
+    Alert.alert(title, message, [
+      { text: "Cancel", style: "cancel", onPress: onCancel },
+      { text: "OK", onPress: onConfirm },
+    ]);
+  }
+};
+
+// Web-compatible TouchableOpacity styling
+const getWebButtonStyle = (className: string) => {
+  if (Platform.OS === "web") {
+    return {
+      className,
+      style: { cursor: "pointer" as any },
+    };
+  }
+  return { className };
+};
 
 export default function AdminSettingsScreen() {
   const { user, logout } = useAuth();
 
   const handleLogout = () => {
-    Alert.alert("Logout", "Are you sure you want to logout?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Logout",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await logout();
-            // Navigate back to onboarding after logout
-            router.replace("/(onboarding)/role-selection");
-          } catch (error) {
-            console.error("Logout error:", error);
-            // Even if logout fails, navigate away for security
-            router.replace("/(onboarding)/role-selection");
-          }
-        },
-      },
-    ]);
+    showConfirm("Logout", "Are you sure you want to logout?", async () => {
+      try {
+        await logout();
+        // Navigate back to onboarding after logout
+        router.replace("/(onboarding)/role-selection");
+      } catch (error) {
+        console.error("Logout error:", error);
+        // Even if logout fails, navigate away for security
+        router.replace("/(onboarding)/role-selection");
+      }
+    });
   };
 
   const SettingsItem = ({
@@ -48,8 +82,10 @@ export default function AdminSettingsScreen() {
     iconColor?: string;
   }) => (
     <TouchableOpacity
-      className="bg-white rounded-xl p-4 mb-3 shadow-sm border border-gray-100 flex-row items-center"
       onPress={onPress}
+      {...getWebButtonStyle(
+        "bg-white rounded-xl p-4 mb-3 shadow-sm border border-gray-100 flex-row items-center"
+      )}
     >
       <View
         className="w-10 h-10 rounded-lg items-center justify-center mr-4"
@@ -120,17 +156,17 @@ export default function AdminSettingsScreen() {
             icon="globe"
             title="System Information"
             subtitle="View app version and system details"
-            onPress={() =>
-              Alert.alert("System Info", "Tricycle Admin App v1.0.0\nBuild: 2024.11.18")
-            }
+            onPress={() => showAlert("System Info", "Tricycle Admin App v1.0.0\nBuild: 2024.11.18")}
           />
+
+          {Platform.OS === "web" && <PWAInstallButton />}
 
           <SettingsItem
             icon="help-circle"
             title="Help & Support"
             subtitle="Get help and contact support"
             onPress={() =>
-              Alert.alert(
+              showAlert(
                 "Help & Support",
                 "Need assistance?\n\n• Email: tricycle.book.app@gmail.com\n• Hotline: +63 912 345 6789\n• Hours: Mon–Fri, 8am–6pm\n\nOur support team will respond within 24 hours."
               )
@@ -142,7 +178,7 @@ export default function AdminSettingsScreen() {
             title="Terms & Privacy"
             subtitle="View terms of service and privacy policy"
             onPress={() =>
-              Alert.alert(
+              showAlert(
                 "Terms & Privacy",
                 "Usage of the Tricycle Admin Dashboard is governed by our Terms of Service and Privacy Policy.\n\n• We collect admin profile information to keep accounts secure.\n• Ride and fare data are stored securely in our cloud infrastructure.\n• Access is restricted to authorized personnel only."
               )

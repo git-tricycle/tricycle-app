@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React from "react";
-import { Text, TouchableOpacity, View, Image } from "react-native";
+import { Text, TouchableOpacity, View, Image, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function Slide1Screen() {
@@ -44,18 +44,25 @@ export default function Slide1Screen() {
         <View className="w-80 h-80 bg-gray-100 rounded-3xl items-center justify-center mb-12">
           <Image
             source={require("@/assets/images/Directions.png")}
-            className="w-80 h-80"
+            style={{
+              width: 320,
+              height: 320,
+              maxWidth: "100%",
+              maxHeight: "100%",
+            }}
             resizeMode="contain"
           />
         </View>
 
         {/* Title */}
-        <Text className="text-3xl font-bold text-black text-center mb-6">Book your Tricycle with ease</Text>
+        <Text className="text-3xl font-bold text-black text-center mb-6">
+          Book your Tricycle with ease
+        </Text>
 
         {/* Description */}
         <Text className="text-lg text-gray-600 text-center leading-7 mb-12">
-          Find and book available tricycles in your area with just a few taps. Quick, reliable, and convenient
-          transportation at your fingertips.
+          Find and book available tricycles in your area with just a few taps. Quick, reliable, and
+          convenient transportation at your fingertips.
         </Text>
       </View>
 
@@ -65,6 +72,7 @@ export default function Slide1Screen() {
           onPress={handleNext}
           className="bg-black rounded-full py-4 items-center border-2 border-black"
           activeOpacity={0.8}
+          style={Platform.OS === "web" ? { cursor: "pointer" } : undefined}
         >
           <Text className="text-white font-semibold text-lg">Next</Text>
         </TouchableOpacity>

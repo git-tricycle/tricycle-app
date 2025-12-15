@@ -41,7 +41,34 @@
     "web": {
       "output": "static",
       "favicon": "./assets/images/tric.jpg",
-      "bundler": "metro"
+      "bundler": "metro",
+      "name": "Ride It! Tricycle Booking",
+      "shortName": "Ride It!",
+      "lang": "en",
+      "scope": "/",
+      "startUrl": "/",
+      "display": "standalone",
+      "orientation": "portrait",
+      "themeColor": "#000000",
+      "backgroundColor": "#ffffff",
+      "preferRelatedApplications": false,
+      "description": "Your trusted tricycle booking companion for safe and convenient rides",
+      "dir": "ltr",
+      "barStyle": "black-content",
+      "meta": {
+        "apple-mobile-web-app-capable": "yes",
+        "apple-mobile-web-app-status-bar-style": "black",
+        "apple-touch-fullscreen": "yes",
+        "mobile-web-app-capable": "yes",
+        "msapplication-tap-highlight": "no"
+      },
+      "build": {
+        "babel": {
+          "include": [
+            "react-native-vector-icons"
+          ]
+        }
+      }
     },
     "plugins": [
       "expo-router",

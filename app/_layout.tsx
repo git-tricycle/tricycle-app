@@ -6,10 +6,12 @@ import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useState } from "react";
 import "react-native-reanimated";
 import "../global.css";
-import { View, Text } from "react-native";
+import { View, Text, Platform } from "react-native";
 
 import { useColorScheme } from "@/src/hooks/use-color-scheme";
 import { AuthProvider } from "@/src/contexts/AuthContext";
+import PWAPrompt from "@/src/components/PWAPrompt";
+import { useServiceWorker } from "@/src/hooks/usePWA";
 
 console.log("🚀 App starting...");
 
@@ -45,6 +47,9 @@ export default function RootLayout() {
     "Poppins-Black": require("@/assets/fonts/Poppins-Black.ttf"),
   });
 
+  // Register service worker on web
+  useServiceWorker();
+
   useEffect(() => {
     // Hide splash when fonts are ready OR after 1 second (whichever comes first)
     const timer = setTimeout(() => {
@@ -72,6 +77,7 @@ export default function RootLayout() {
           <Stack.Screen name="modal" options={{ presentation: "modal", title: "Modal" }} />
         </Stack>
         <StatusBar style="auto" />
+        {Platform.OS === "web" && <PWAPrompt />}
       </ThemeProvider>
     </AuthProvider>
   );
