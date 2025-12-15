@@ -5,7 +5,6 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  Alert,
   RefreshControl,
   Modal,
 } from "react-native";
@@ -13,6 +12,12 @@ import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Colors } from "@/src/constants/theme";
 import { fareService, FareSettings } from "@/src/services/fare.service";
+import {
+  showErrorAlert,
+  showSuccessAlert,
+  showWarningConfirm,
+  showDestructiveConfirm,
+} from "@/src/utils/alerts";
 
 export default function FareManagementScreen() {
   const [currentSettings, setCurrentSettings] = useState<FareSettings | null>(null);
@@ -53,7 +58,10 @@ export default function FareManagementScreen() {
       }
     } catch (error) {
       console.error("Error loading fare data:", error);
-      Alert.alert("Error", "Failed to load fare data");
+      showErrorAlert(
+        "Loading Error",
+        "Failed to load fare data. Please check your connection and try again."
+      );
     } finally {
       setIsLoading(false);
       setRefreshing(false);
@@ -89,32 +97,32 @@ export default function FareManagementScreen() {
     const timeBasedRate = formData.timeBasedRate ? parseFloat(formData.timeBasedRate) : undefined;
 
     if (isNaN(baseFare) || baseFare <= 0) {
-      Alert.alert("Error", "Please enter a valid base fare");
+      showErrorAlert("Invalid Base Fare", "Please enter a valid base fare amount");
       return;
     }
 
     if (isNaN(ratePerKm) || ratePerKm <= 0) {
-      Alert.alert("Error", "Please enter a valid rate per km");
+      showErrorAlert("Invalid Rate", "Please enter a valid rate per kilometer");
       return;
     }
 
     if (minimumFare !== undefined && (isNaN(minimumFare) || minimumFare < 0)) {
-      Alert.alert("Error", "Please enter a valid minimum fare");
+      showErrorAlert("Invalid Minimum Fare", "Please enter a valid minimum fare amount");
       return;
     }
 
     if (maximumFare !== undefined && (isNaN(maximumFare) || maximumFare <= 0)) {
-      Alert.alert("Error", "Please enter a valid maximum fare");
+      showErrorAlert("Invalid Maximum Fare", "Please enter a valid maximum fare amount");
       return;
     }
 
     if (minimumFare !== undefined && maximumFare !== undefined && minimumFare >= maximumFare) {
-      Alert.alert("Error", "Maximum fare must be greater than minimum fare");
+      showErrorAlert("Invalid Fare Range", "Maximum fare must be greater than minimum fare");
       return;
     }
 
     if (timeBasedRate !== undefined && (isNaN(timeBasedRate) || timeBasedRate < 0)) {
-      Alert.alert("Error", "Please enter a valid time-based rate");
+      showErrorAlert("Invalid Time Rate", "Please enter a valid time-based rate");
       return;
     }
 
@@ -128,7 +136,10 @@ export default function FareManagementScreen() {
       });
 
       if (response.success) {
-        Alert.alert("Success", "Fare settings created successfully");
+        showSuccessAlert(
+          "Fare Settings Created",
+          "New fare settings have been created successfully and are now active"
+        );
         setShowCreateModal(false);
         setFormData({
           baseFare: "",
@@ -139,11 +150,14 @@ export default function FareManagementScreen() {
         });
         loadFareData();
       } else {
-        Alert.alert("Error", response.message);
+        showErrorAlert("Creation Failed", response.message || "Failed to create fare settings");
       }
     } catch (error) {
       console.error("Error creating fare settings:", error);
-      Alert.alert("Error", "Failed to create fare settings");
+      showErrorAlert(
+        "Network Error",
+        "Failed to create fare settings. Please check your connection and try again."
+      );
     }
   };
 
@@ -157,32 +171,32 @@ export default function FareManagementScreen() {
     const timeBasedRate = formData.timeBasedRate ? parseFloat(formData.timeBasedRate) : undefined;
 
     if (isNaN(baseFare) || baseFare <= 0) {
-      Alert.alert("Error", "Please enter a valid base fare");
+      showErrorAlert("Invalid Base Fare", "Please enter a valid base fare amount");
       return;
     }
 
     if (isNaN(ratePerKm) || ratePerKm <= 0) {
-      Alert.alert("Error", "Please enter a valid rate per km");
+      showErrorAlert("Invalid Rate", "Please enter a valid rate per kilometer");
       return;
     }
 
     if (minimumFare !== undefined && (isNaN(minimumFare) || minimumFare < 0)) {
-      Alert.alert("Error", "Please enter a valid minimum fare");
+      showErrorAlert("Invalid Minimum Fare", "Please enter a valid minimum fare amount");
       return;
     }
 
     if (maximumFare !== undefined && (isNaN(maximumFare) || maximumFare <= 0)) {
-      Alert.alert("Error", "Please enter a valid maximum fare");
+      showErrorAlert("Invalid Maximum Fare", "Please enter a valid maximum fare amount");
       return;
     }
 
     if (minimumFare !== undefined && maximumFare !== undefined && minimumFare >= maximumFare) {
-      Alert.alert("Error", "Maximum fare must be greater than minimum fare");
+      showErrorAlert("Invalid Fare Range", "Maximum fare must be greater than minimum fare");
       return;
     }
 
     if (timeBasedRate !== undefined && (isNaN(timeBasedRate) || timeBasedRate < 0)) {
-      Alert.alert("Error", "Please enter a valid time-based rate");
+      showErrorAlert("Invalid Time Rate", "Please enter a valid time-based rate");
       return;
     }
 
@@ -196,7 +210,10 @@ export default function FareManagementScreen() {
       });
 
       if (response.success) {
-        Alert.alert("Success", "Fare settings updated successfully");
+        showSuccessAlert(
+          "Fare Settings Updated",
+          "Fare settings have been updated successfully and changes are now active"
+        );
         setShowEditModal(false);
         setSelectedSettings(null);
         setFormData({
@@ -208,12 +225,25 @@ export default function FareManagementScreen() {
         });
         loadFareData();
       } else {
-        Alert.alert("Error", response.message);
+        showErrorAlert("Update Failed", response.message || "Failed to update fare settings");
       }
     } catch (error) {
       console.error("Error updating fare settings:", error);
-      Alert.alert("Error", "Failed to update fare settings");
+      showErrorAlert(
+        "Network Error",
+        "Failed to update fare settings. Please check your connection and try again."
+      );
     }
+  };
+
+  const confirmActivateSettings = (settings: FareSettings) => {
+    showWarningConfirm(
+      "Activate Fare Settings",
+      `Are you sure you want to activate these fare settings? This will deactivate any currently active settings and apply the new rates:\n\nBase Fare: ₱${settings.baseFare}\nRate per KM: ₱${settings.ratePerKm}`,
+      () => handleActivateSettings(settings),
+      undefined,
+      "Activate"
+    );
   };
 
   const handleActivateSettings = async (settings: FareSettings) => {
@@ -223,45 +253,61 @@ export default function FareManagementScreen() {
       });
 
       if (response.success) {
-        Alert.alert("Success", "Fare settings activated successfully");
+        showSuccessAlert(
+          "Fare Settings Activated",
+          "The new fare settings are now active and will be used for all new rides"
+        );
         loadFareData();
       } else {
-        Alert.alert("Error", response.message);
+        showErrorAlert("Activation Failed", response.message || "Failed to activate fare settings");
       }
     } catch (error) {
       console.error("Error activating fare settings:", error);
-      Alert.alert("Error", "Failed to activate fare settings");
+      showErrorAlert(
+        "Network Error",
+        "Failed to activate fare settings. Please check your connection."
+      );
     }
   };
 
-  const handleDeleteSettings = async (settings: FareSettings) => {
+  const confirmDeleteSettings = (settings: FareSettings) => {
     if (settings.isActive) {
-      Alert.alert("Error", "Cannot delete active fare settings");
+      showErrorAlert(
+        "Cannot Delete Active Settings",
+        "You cannot delete the currently active fare settings. Please activate different settings first."
+      );
       return;
     }
 
-    Alert.alert("Delete Fare Settings", "Are you sure you want to delete these fare settings?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            const response = await fareService.deleteFareSettings(settings.id);
+    showDestructiveConfirm(
+      "Delete Fare Settings",
+      `Are you sure you want to permanently delete these fare settings?\n\nBase Fare: ₱${settings.baseFare}\nRate per KM: ₱${settings.ratePerKm}\n\nThis action cannot be undone.`,
+      () => handleDeleteSettings(settings),
+      undefined,
+      "Delete Permanently"
+    );
+  };
 
-            if (response.success) {
-              Alert.alert("Success", "Fare settings deleted successfully");
-              loadFareData();
-            } else {
-              Alert.alert("Error", response.message);
-            }
-          } catch (error) {
-            console.error("Error deleting fare settings:", error);
-            Alert.alert("Error", "Failed to delete fare settings");
-          }
-        },
-      },
-    ]);
+  const handleDeleteSettings = async (settings: FareSettings) => {
+    try {
+      const response = await fareService.deleteFareSettings(settings.id);
+
+      if (response.success) {
+        showSuccessAlert(
+          "Fare Settings Deleted",
+          "The fare settings have been permanently deleted"
+        );
+        loadFareData();
+      } else {
+        showErrorAlert("Deletion Failed", response.message || "Failed to delete fare settings");
+      }
+    } catch (error) {
+      console.error("Error deleting fare settings:", error);
+      showErrorAlert(
+        "Network Error",
+        "Failed to delete fare settings. Please check your connection."
+      );
+    }
   };
 
   const openEditModal = (settings: FareSettings) => {
@@ -285,6 +331,26 @@ export default function FareManagementScreen() {
       timeBasedRate: "",
     });
     setShowCreateModal(true);
+  };
+
+  const confirmCreateSettings = () => {
+    showWarningConfirm(
+      "Create New Fare Settings",
+      "Are you sure you want to create these new fare settings? You can activate them later to make them the current rates for all rides.",
+      handleCreateSettings,
+      undefined,
+      "Create Settings"
+    );
+  };
+
+  const confirmUpdateSettings = () => {
+    showWarningConfirm(
+      "Update Fare Settings",
+      "Are you sure you want to update these fare settings? If these settings are currently active, the changes will affect all new rides immediately.",
+      handleUpdateSettings,
+      undefined,
+      "Update Settings"
+    );
   };
 
   useEffect(() => {
@@ -332,7 +398,7 @@ export default function FareManagementScreen() {
           </TouchableOpacity>
           {!settings.isActive && (
             <TouchableOpacity
-              onPress={() => handleActivateSettings(settings)}
+              onPress={() => confirmActivateSettings(settings)}
               className="w-8 h-8 bg-green-50 rounded-lg items-center justify-center"
             >
               <Ionicons name="checkmark" size={16} color="#10B981" />
@@ -340,7 +406,7 @@ export default function FareManagementScreen() {
           )}
           {!settings.isActive && (
             <TouchableOpacity
-              onPress={() => handleDeleteSettings(settings)}
+              onPress={() => confirmDeleteSettings(settings)}
               className="w-8 h-8 bg-red-50 rounded-lg items-center justify-center"
             >
               <Ionicons name="trash" size={16} color="#EF4444" />
@@ -526,7 +592,7 @@ export default function FareManagementScreen() {
       <FormModal
         visible={showCreateModal}
         onClose={() => setShowCreateModal(false)}
-        onSubmit={handleCreateSettings}
+        onSubmit={confirmCreateSettings}
         title="Create Fare Settings"
       />
 
@@ -537,7 +603,7 @@ export default function FareManagementScreen() {
           setShowEditModal(false);
           setSelectedSettings(null);
         }}
-        onSubmit={handleUpdateSettings}
+        onSubmit={confirmUpdateSettings}
         title="Update Fare Settings"
       />
     </SafeAreaView>

@@ -13,6 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useAuth } from "@/src/contexts/AuthContext";
 import { Colors } from "@/src/constants/theme";
+import { showErrorAlert, showSuccessAlert } from "@/src/utils/alerts";
 
 export default function AdminLoginScreen() {
   const { login, isLoading } = useAuth();
@@ -31,18 +32,18 @@ export default function AdminLoginScreen() {
 
   const validateForm = () => {
     if (!formData.email.trim()) {
-      Alert.alert("Error", "Please enter your email address");
+      showErrorAlert("Validation Error", "Please enter your email address");
       return false;
     }
 
     if (!formData.password.trim()) {
-      Alert.alert("Error", "Please enter your password");
+      showErrorAlert("Validation Error", "Please enter your password");
       return false;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
-      Alert.alert("Error", "Please enter a valid email address");
+      showErrorAlert("Invalid Email", "Please enter a valid email address");
       return false;
     }
 
@@ -59,14 +60,27 @@ export default function AdminLoginScreen() {
         role: "admin",
       });
 
+      showSuccessAlert("Login Successful", "Welcome to Admin Dashboard!");
       // Navigation will be handled by the auth context
       router.replace("/(admin)/dashboard");
     } catch (error) {
-      console.error("Login error:", error);
-      Alert.alert(
-        "Login Failed",
-        error instanceof Error ? error.message : "Invalid credentials. Please try again."
-      );
+      console.error("Admin login error:", error);
+
+      let errorMessage = "Invalid credentials. Please try again.";
+
+      if (error instanceof Error) {
+        if (error.message.includes("network") || error.message.includes("fetch")) {
+          errorMessage = "Network error. Please check your internet connection and try again.";
+        } else if (error.message.includes("unauthorized") || error.message.includes("invalid")) {
+          errorMessage = "Invalid email or password. Please check your credentials.";
+        } else if (error.message.includes("account")) {
+          errorMessage = "Account not found or access denied. Please contact system administrator.";
+        } else {
+          errorMessage = error.message;
+        }
+      }
+
+      showErrorAlert("Admin Login Failed", errorMessage);
     }
   };
 

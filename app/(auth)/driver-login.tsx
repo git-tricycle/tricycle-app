@@ -13,6 +13,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { showErrorAlert, showSuccessAlert } from "@/src/utils/alerts";
 
 export default function DriverLoginScreen() {
   const [email, setEmail] = useState("");
@@ -24,8 +25,20 @@ export default function DriverLoginScreen() {
   const { login } = useAuth();
 
   const handleLogin = async () => {
-    if (!email.trim() || !password.trim()) {
-      Alert.alert("Error", "Please fill in all fields");
+    // Validation
+    if (!email.trim()) {
+      showErrorAlert("Validation Error", "Please enter your email address");
+      return;
+    }
+
+    if (!password.trim()) {
+      showErrorAlert("Validation Error", "Please enter your password");
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      showErrorAlert("Invalid Email", "Please enter a valid email address");
       return;
     }
 
@@ -38,10 +51,29 @@ export default function DriverLoginScreen() {
         role: "driver",
       });
 
+      showSuccessAlert("Login Successful", "Welcome back, driver!");
       // Navigation will be handled by the auth context
       router.replace("/(driver)/dashboard");
     } catch (error: any) {
-      Alert.alert("Login Failed", error.message || "Please check your credentials and try again");
+      console.error("Driver login error:", error);
+
+      let errorMessage = "Please check your credentials and try again";
+
+      if (error.message) {
+        if (error.message.includes("network") || error.message.includes("fetch")) {
+          errorMessage = "Network error. Please check your internet connection and try again.";
+        } else if (error.message.includes("unauthorized") || error.message.includes("invalid")) {
+          errorMessage = "Invalid email or password. Please check your credentials.";
+        } else if (error.message.includes("verification") || error.message.includes("pending")) {
+          errorMessage = "Account pending verification. Please wait for admin approval.";
+        } else if (error.message.includes("suspended") || error.message.includes("banned")) {
+          errorMessage = "Account suspended. Please contact support for assistance.";
+        } else {
+          errorMessage = error.message;
+        }
+      }
+
+      showErrorAlert("Driver Login Failed", errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -57,12 +89,15 @@ export default function DriverLoginScreen() {
 
   const handleForgotPassword = () => {
     // TODO: Implement forgot password
-    Alert.alert("Coming Soon", "Password reset will be available soon");
+    showErrorAlert("Feature Coming Soon", "Password reset will be available in the next update");
   };
 
   return (
     <SafeAreaView className="flex-1 bg-white">
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} className="flex-1">
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        className="flex-1"
+      >
         <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
           {/* Header */}
           <View className="flex-row items-center px-6 py-4">
@@ -111,7 +146,10 @@ export default function DriverLoginScreen() {
                     autoCapitalize="none"
                     autoCorrect={false}
                   />
-                  <TouchableOpacity onPress={() => setShowPassword(!showPassword)} className="absolute right-4 top-3">
+                  <TouchableOpacity
+                    onPress={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-3"
+                  >
                     <Ionicons name={showPassword ? "eye-off" : "eye"} size={20} color="#6b7280" />
                   </TouchableOpacity>
                 </View>
@@ -119,7 +157,10 @@ export default function DriverLoginScreen() {
 
               {/* Remember Me & Forgot Password */}
               <View className="flex-row items-center justify-between mt-5">
-                <TouchableOpacity onPress={() => setRememberMe(!rememberMe)} className="flex-row items-center">
+                <TouchableOpacity
+                  onPress={() => setRememberMe(!rememberMe)}
+                  className="flex-row items-center"
+                >
                   <View
                     className={`w-5 h-5 rounded border-2 mr-2 items-center justify-center ${
                       rememberMe ? "bg-black border-black" : "border-gray-300"
@@ -144,7 +185,9 @@ export default function DriverLoginScreen() {
                 }`}
                 activeOpacity={0.8}
               >
-                <Text className="text-white font-semibold text-lg">{isLoading ? "Logging in..." : "Login"}</Text>
+                <Text className="text-white font-semibold text-lg">
+                  {isLoading ? "Logging in..." : "Login"}
+                </Text>
               </TouchableOpacity>
 
               {/* Register Link */}
@@ -163,8 +206,8 @@ export default function DriverLoginScreen() {
                 <Text className="text-black font-semibold ml-2">Driver Requirements</Text>
               </View>
               <Text className="text-gray-700 text-sm leading-5">
-                • Valid driver&apos;s license{"\n"}• Tricycle registration documents{"\n"}• Valid government ID{"\n"}•
-                Account verification required
+                • Valid driver&apos;s license{"\n"}• Tricycle registration documents{"\n"}• Valid
+                government ID{"\n"}• Account verification required
               </Text>
             </View>
           </View>
