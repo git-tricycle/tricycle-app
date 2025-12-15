@@ -80,11 +80,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
     } catch (error) {
       console.error("Auth check failed:", error);
+      // Don't crash the app if auth check fails
       dispatch({ type: "CLEAR_USER" });
     } finally {
       dispatch({ type: "SET_LOADING", payload: false });
     }
   };
+
+  useEffect(() => {
+    // Initialize auth when component mounts
+    const initAuth = async () => {
+      try {
+        await checkAuthStatus();
+      } catch (error) {
+        console.error("Failed to check auth:", error);
+        dispatch({ type: "SET_LOADING", payload: false });
+      }
+    };
+
+    initAuth();
+  }, []);
 
   // Login function
   const login = async (credentials: LoginCredentials) => {
