@@ -12,8 +12,14 @@ import { useColorScheme } from "@/src/hooks/use-color-scheme";
 import { AuthProvider } from "@/src/contexts/AuthContext";
 import PWAPrompt from "@/src/components/PWAPrompt";
 import { useServiceWorker } from "@/src/hooks/usePWA";
+import { initPWA } from "@/src/lib/pwa-init";
 
 console.log("🚀 App starting...");
+
+// Initialize PWA on app load
+if (typeof window !== "undefined") {
+  initPWA();
+}
 
 // Safely hide splash screen
 const hideSplash = async () => {
