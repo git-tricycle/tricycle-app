@@ -1,21 +1,13 @@
 import React from "react";
-import { View, Text, ScrollView, TouchableOpacity, Alert, Platform } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { useAuth } from "@/src/contexts/AuthContext";
 import { useConfirm } from "@/src/hooks/useConfirm";
+import { useAlert } from "@/src/hooks/useAlert";
 import { Colors } from "@/src/constants/theme";
 import { PWAInstallButton } from "@/src/components/PWAPrompt";
-
-// Web compatibility utilities
-const showAlert = (title: string, message?: string) => {
-  if (Platform.OS === "web") {
-    window.alert(`${title}${message ? `\n${message}` : ""}`);
-  } else {
-    Alert.alert(title, message);
-  }
-};
 
 // Web-compatible TouchableOpacity styling
 const getWebButtonStyle = (className: string) => {
@@ -31,6 +23,7 @@ const getWebButtonStyle = (className: string) => {
 export default function AdminSettingsScreen() {
   const { user, logout } = useAuth();
   const { showConfirm, ConfirmModalComponent } = useConfirm();
+  const { showAlert, AlertModalComponent } = useAlert();
 
   const handleLogout = async () => {
     const confirmed = await showConfirm({
@@ -145,7 +138,13 @@ export default function AdminSettingsScreen() {
             icon="globe"
             title="System Information"
             subtitle="View app version and system details"
-            onPress={() => showAlert("System Info", "Tricycle Admin App v1.0.0\nBuild: 2024.11.18")}
+            onPress={() =>
+              showAlert({
+                type: "info",
+                title: "System Info",
+                message: "Tricycle Admin App v1.0.0\nBuild: 2024.11.18",
+              })
+            }
           />
 
           {Platform.OS === "web" && <PWAInstallButton />}
@@ -155,10 +154,12 @@ export default function AdminSettingsScreen() {
             title="Help & Support"
             subtitle="Get help and contact support"
             onPress={() =>
-              showAlert(
-                "Help & Support",
-                "Need assistance?\n\n• Email: tricycle.book.app@gmail.com\n• Hotline: +63 912 345 6789\n• Hours: Mon–Fri, 8am–6pm\n\nOur support team will respond within 24 hours."
-              )
+              showAlert({
+                type: "info",
+                title: "Help & Support",
+                message:
+                  "Need assistance?\n\n• Email: tricycle.book.app@gmail.com\n• Hotline: +63 912 345 6789\n• Hours: Mon–Fri, 8am–6pm\n\nOur support team will respond within 24 hours.",
+              })
             }
           />
 
@@ -167,10 +168,12 @@ export default function AdminSettingsScreen() {
             title="Terms & Privacy"
             subtitle="View terms of service and privacy policy"
             onPress={() =>
-              showAlert(
-                "Terms & Privacy",
-                "Usage of the Tricycle Admin Dashboard is governed by our Terms of Service and Privacy Policy.\n\n• We collect admin profile information to keep accounts secure.\n• Ride and fare data are stored securely in our cloud infrastructure.\n• Access is restricted to authorized personnel only."
-              )
+              showAlert({
+                type: "info",
+                title: "Terms & Privacy",
+                message:
+                  "Usage of the Tricycle Admin Dashboard is governed by our Terms of Service and Privacy Policy.\n\n• We collect admin profile information to keep accounts secure.\n• Ride and fare data are stored securely in our cloud infrastructure.\n• Access is restricted to authorized personnel only.",
+              })
             }
           />
         </View>
@@ -197,8 +200,9 @@ export default function AdminSettingsScreen() {
         </View>
       </ScrollView>
 
-      {/* Confirmation Modal */}
+      {/* Modals */}
       <ConfirmModalComponent />
+      <AlertModalComponent />
     </SafeAreaView>
   );
 }
