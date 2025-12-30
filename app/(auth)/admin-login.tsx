@@ -61,8 +61,7 @@ export default function AdminLoginScreen() {
       });
 
       showSuccessAlert("Login Successful", "Welcome to Admin Dashboard!");
-      // Navigation will be handled by the auth context
-      router.replace("/(admin)/dashboard");
+      // Navigation will be handled automatically by AuthContext
     } catch (error) {
       console.error("Admin login error:", error);
 

@@ -5,7 +5,8 @@ import { DriverRegistrationData } from "@/src/types/auth";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useState } from "react";
-import { Alert, Modal, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { Modal, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { useAlert } from "@/src/hooks/useAlert";
 
 type RegistrationStep = "personal" | "account" | "vehicle" | "emergency";
 
@@ -18,6 +19,7 @@ export default function DriverRegisterScreen() {
   const [activeTab, setActiveTab] = useState<"terms" | "privacy" | "data">("terms");
 
   const { register } = useAuth();
+  const { showAlert, AlertModalComponent } = useAlert();
 
   const steps: RegistrationStep[] = ["personal", "account", "vehicle", "emergency"];
   const currentStepIndex = steps.indexOf(currentStep) + 1;
@@ -119,11 +121,18 @@ export default function DriverRegisterScreen() {
       await register(registrationData, "driver");
 
       // Show success message and navigate to dashboard
-      Alert.alert("Registration Successful", "Your account was created successfully!", [
-        { text: "OK", onPress: () => router.replace("/(driver)/dashboard") },
-      ]);
+      await showAlert({
+        type: "success",
+        title: "Registration Successful",
+        message: "Your account was created successfully!",
+      });
+      router.replace("/(driver)/dashboard");
     } catch (error: any) {
-      Alert.alert("Registration Failed", error.message || "Please try again");
+      await showAlert({
+        type: "error",
+        title: "Registration Failed",
+        message: error.message || "Please try again",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -547,6 +556,7 @@ export default function DriverRegisterScreen() {
 
   return (
     <>
+      {AlertModalComponent}
       <FormStep
         title={getStepTitle()}
         subtitle={getStepSubtitle()}

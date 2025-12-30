@@ -5,17 +5,8 @@ import { StudentRegistrationData } from "@/src/types/auth";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useState } from "react";
-import {
-  Alert,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
-import { showErrorAlert, showSuccessAlert } from "@/src/utils/alerts";
+import { Modal, Platform, Pressable, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { useAlert } from "@/src/hooks/useAlert";
 
 type RegistrationStep = "personal" | "contact" | "security" | "verification";
 
@@ -28,6 +19,7 @@ export default function StudentRegisterScreen() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
   const { register } = useAuth();
+  const { showAlert, AlertModalComponent } = useAlert();
 
   const steps: RegistrationStep[] = ["personal", "contact", "security", "verification"];
   const currentStepIndex = steps.indexOf(currentStep) + 1;
@@ -115,10 +107,11 @@ export default function StudentRegisterScreen() {
       setIsLoading(true);
       await register(formData as StudentRegistrationData, "passenger");
 
-      showSuccessAlert(
-        "Registration Successful",
-        "Welcome to Ride It! Your student account has been created successfully."
-      );
+      await showAlert({
+        type: "success",
+        title: "Registration Successful",
+        message: "Welcome to Ride It! Your student account has been created successfully.",
+      });
       router.replace("/(student)/dashboard");
     } catch (error: any) {
       console.error("Student registration error:", error);
@@ -141,7 +134,11 @@ export default function StudentRegisterScreen() {
         }
       }
 
-      showErrorAlert("Student Registration Failed", errorMessage);
+      await showAlert({
+        type: "error",
+        title: "Student Registration Failed",
+        message: errorMessage,
+      });
     } finally {
       setIsLoading(false);
     }
@@ -549,17 +546,20 @@ export default function StudentRegisterScreen() {
   const isLastStep = currentStep === "verification";
 
   return (
-    <FormStep
-      title={getStepTitle()}
-      subtitle={getStepSubtitle()}
-      currentStep={currentStepIndex}
-      totalSteps={totalSteps}
-      onBack={handleBack}
-      onNext={isLastStep ? handleSubmit : handleNext}
-      nextButtonText={isLastStep ? "Create Account" : "Next"}
-      isLoading={isLoading}
-    >
-      {getStepContent()}
-    </FormStep>
+    <>
+      {AlertModalComponent}
+      <FormStep
+        title={getStepTitle()}
+        subtitle={getStepSubtitle()}
+        currentStep={currentStepIndex}
+        totalSteps={totalSteps}
+        onBack={handleBack}
+        onNext={isLastStep ? handleSubmit : handleNext}
+        nextButtonText={isLastStep ? "Create Account" : "Next"}
+        isLoading={isLoading}
+      >
+        {getStepContent()}
+      </FormStep>
+    </>
   );
 }
