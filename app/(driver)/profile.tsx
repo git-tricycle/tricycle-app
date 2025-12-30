@@ -1,25 +1,24 @@
-import React, { useState, useEffect } from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  Alert,
-  ActivityIndicator,
-  TextInput,
-  RefreshControl,
-  Image,
-  Platform,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
-import * as ImagePicker from "expo-image-picker";
 import { useAuth } from "@/src/contexts/AuthContext";
 import { driverService, type Driver } from "@/src/services/driver.service";
-import { vehicleService, type Vehicle } from "@/src/services/vehicle.service";
 import { userService } from "@/src/services/user.service";
-import { PWAInstallButton } from "@/src/components/PWAPrompt";
+import { vehicleService, type Vehicle } from "@/src/services/vehicle.service";
+import { useConfirm } from "@/src/hooks/useConfirm";
+import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
+import { router } from "expo-router";
+import React, { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 // Web compatibility utilities
 const showAlert = (title: string, message?: string) => {
@@ -27,26 +26,6 @@ const showAlert = (title: string, message?: string) => {
     window.alert(`${title}${message ? `\n${message}` : ""}`);
   } else {
     Alert.alert(title, message);
-  }
-};
-
-const showConfirm = (
-  title: string,
-  message: string,
-  onConfirm: () => void,
-  onCancel?: () => void
-) => {
-  if (Platform.OS === "web") {
-    if (window.confirm(`${title}\n${message}`)) {
-      onConfirm();
-    } else if (onCancel) {
-      onCancel();
-    }
-  } else {
-    Alert.alert(title, message, [
-      { text: "Cancel", style: "cancel", onPress: onCancel },
-      { text: "OK", onPress: onConfirm },
-    ]);
   }
 };
 
@@ -63,6 +42,7 @@ const getWebButtonStyle = (className: string) => {
 
 export default function DriverProfileScreen() {
   const { user, logout } = useAuth();
+  const { showConfirm, ConfirmModalComponent } = useConfirm();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [driverProfile, setDriverProfile] = useState<Driver | null>(null);
@@ -129,19 +109,22 @@ export default function DriverProfileScreen() {
           setDriverProfile(null);
 
           // Show alert to create driver profile
-          showConfirm(
-            "Driver Profile Required",
-            "You need to create a driver profile to access this feature. Would you like to create one now?",
-            () => {
-              setIsEditing(true);
-              setEditableData({
-                username: "",
-                address: "",
-                contactNumber: "",
-                age: "",
-              });
-            }
-          );
+          const confirmed = await showConfirm({
+            title: "Driver Profile Required",
+            message:
+              "You need to create a driver profile to access this feature. Would you like to create one now?",
+            icon: "car",
+          });
+
+          if (confirmed) {
+            setIsEditing(true);
+            setEditableData({
+              username: "",
+              address: "",
+              contactNumber: "",
+              age: "",
+            });
+          }
         }
       } else {
         console.log("Failed to load user data:", userResponse.message);
@@ -536,42 +519,46 @@ export default function DriverProfileScreen() {
       return;
     }
 
-    showConfirm(
-      "Delete Document",
-      `Are you sure you want to delete your ${documentType === "vehiclePhoto" ? "vehicle photo" : "OR/CR document"}?`,
-      async () => {
-        try {
-          setIsUploadingDocument(true);
+    const confirmed = await showConfirm({
+      title: "Delete Document",
+      message: `Are you sure you want to delete your ${documentType === "vehiclePhoto" ? "vehicle photo" : "OR/CR document"}?`,
+      destructive: true,
+      icon: "trash",
+      confirmText: "Delete",
+    });
 
-          const response = await vehicleService.deleteVehicleDocuments(vehicle.id, documentType);
+    if (confirmed) {
+      try {
+        setIsUploadingDocument(true);
 
-          if (response.success) {
-            // Update local state
-            if (response.data) {
-              setVehicle({
-                ...vehicle,
-                ...response.data,
-              });
-            }
+        const response = await vehicleService.deleteVehicleDocuments(vehicle.id, documentType);
 
-            showAlert(
-              "Success",
-              `${documentType === "vehiclePhoto" ? "Vehicle photo" : "OR/CR document"} deleted successfully.`
-            );
-
-            // Refresh profile data
-            await loadProfileData();
-          } else {
-            showAlert("Delete Failed", response.message || "Failed to delete document");
+        if (response.success) {
+          // Update local state
+          if (response.data) {
+            setVehicle({
+              ...vehicle,
+              ...response.data,
+            });
           }
-        } catch (error) {
-          console.error("Error deleting vehicle document:", error);
-          showAlert("Error", "Failed to delete document. Please try again.");
-        } finally {
-          setIsUploadingDocument(false);
+
+          showAlert(
+            "Success",
+            `${documentType === "vehiclePhoto" ? "Vehicle photo" : "OR/CR document"} deleted successfully.`
+          );
+
+          // Refresh profile data
+          await loadProfileData();
+        } else {
+          showAlert("Delete Failed", response.message || "Failed to delete document");
         }
+      } catch (error) {
+        console.error("Error deleting vehicle document:", error);
+        showAlert("Error", "Failed to delete document. Please try again.");
+      } finally {
+        setIsUploadingDocument(false);
       }
-    );
+    }
   };
 
   const handleDeleteDocument = async (documentType: "license" | "validId") => {
@@ -580,49 +567,60 @@ export default function DriverProfileScreen() {
       return;
     }
 
-    showConfirm(
-      "Delete Document",
-      `Are you sure you want to delete your ${documentType === "license" ? "license photo" : "valid ID"}? This will affect your verification status.`,
-      async () => {
-        try {
-          setIsUploadingDocument(true);
+    const confirmed = await showConfirm({
+      title: "Delete Document",
+      message: `Are you sure you want to delete your ${documentType === "license" ? "license photo" : "valid ID"}? This will affect your verification status.`,
+      destructive: true,
+      icon: "trash",
+      confirmText: "Delete",
+    });
 
-          const response = await driverService.deleteRequirements(driverProfile.id, documentType);
+    if (confirmed) {
+      try {
+        setIsUploadingDocument(true);
 
-          if (response.success) {
-            // Update local state
-            if (response.data) {
-              setDriverProfile({
-                ...driverProfile,
-                ...response.data,
-              });
-            }
+        const response = await driverService.deleteRequirements(driverProfile.id, documentType);
 
-            showAlert(
-              "Success",
-              `${documentType === "license" ? "License photo" : "Valid ID"} deleted successfully.`
-            );
-
-            // Refresh profile data
-            await loadProfileData();
-          } else {
-            showAlert("Delete Failed", response.message || "Failed to delete document");
+        if (response.success) {
+          // Update local state
+          if (response.data) {
+            setDriverProfile({
+              ...driverProfile,
+              ...response.data,
+            });
           }
-        } catch (error) {
-          console.error("Error deleting document:", error);
-          showAlert("Error", "Failed to delete document. Please try again.");
-        } finally {
-          setIsUploadingDocument(false);
+
+          showAlert(
+            "Success",
+            `${documentType === "license" ? "License photo" : "Valid ID"} deleted successfully.`
+          );
+
+          // Refresh profile data
+          await loadProfileData();
+        } else {
+          showAlert("Delete Failed", response.message || "Failed to delete document");
         }
+      } catch (error) {
+        console.error("Error deleting document:", error);
+        showAlert("Error", "Failed to delete document. Please try again.");
+      } finally {
+        setIsUploadingDocument(false);
       }
-    );
+    }
   };
 
-  const handleLogout = () => {
-    showConfirm("Confirm Logout", "Are you sure you want to logout?", async () => {
+  const handleLogout = async () => {
+    const confirmed = await showConfirm({
+      title: "Confirm Logout",
+      message: "Are you sure you want to logout?",
+      icon: "log-out",
+      confirmText: "Logout",
+    });
+
+    if (confirmed) {
       await logout();
       router.replace("/(onboarding)/welcome");
-    });
+    }
   };
 
   const renderProfileField = (
@@ -1065,46 +1063,10 @@ export default function DriverProfileScreen() {
             </View>
           )}
         </View>
-
-        {/* Account Settings */}
-        <View className="bg-white mx-6 mt-6 mb-6 rounded-2xl p-6 shadow-sm">
-          <Text className="text-black text-lg font-semibold mb-4">Account Settings</Text>
-
-          {Platform.OS === "web" && <PWAInstallButton />}
-
-          <TouchableOpacity className="flex-row items-center justify-between p-4 border-b border-gray-100">
-            <View className="flex-row items-center">
-              <Ionicons name="shield-checkmark" size={20} color="#6b7280" />
-              <Text className="text-black ml-3">Privacy & Security</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#6b7280" />
-          </TouchableOpacity>
-
-          <TouchableOpacity className="flex-row items-center justify-between p-4 border-b border-gray-100">
-            <View className="flex-row items-center">
-              <Ionicons name="notifications" size={20} color="#6b7280" />
-              <Text className="text-black ml-3">Notifications</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#6b7280" />
-          </TouchableOpacity>
-
-          <TouchableOpacity className="flex-row items-center justify-between p-4 border-b border-gray-100">
-            <View className="flex-row items-center">
-              <Ionicons name="help-circle" size={20} color="#6b7280" />
-              <Text className="text-black ml-3">Help & Support</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#6b7280" />
-          </TouchableOpacity>
-
-          <TouchableOpacity className="flex-row items-center justify-between p-4">
-            <View className="flex-row items-center">
-              <Ionicons name="information-circle" size={20} color="#6b7280" />
-              <Text className="text-black ml-3">About</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#6b7280" />
-          </TouchableOpacity>
-        </View>
       </ScrollView>
+
+      {/* Confirmation Modal */}
+      <ConfirmModalComponent />
     </SafeAreaView>
   );
 }

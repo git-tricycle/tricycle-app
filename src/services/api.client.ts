@@ -53,6 +53,35 @@ export const TokenStorage = {
       console.error("Error removing token:", error);
     }
   },
+
+  async getUserData(): Promise<any | null> {
+    try {
+      const AsyncStorage = require("@react-native-async-storage/async-storage").default;
+      const userData = await AsyncStorage.getItem("userData");
+      return userData ? JSON.parse(userData) : null;
+    } catch (error) {
+      console.error("Error getting user data:", error);
+      return null;
+    }
+  },
+
+  async setUserData(user: any): Promise<void> {
+    try {
+      const AsyncStorage = require("@react-native-async-storage/async-storage").default;
+      await AsyncStorage.setItem("userData", JSON.stringify(user));
+    } catch (error) {
+      console.error("Error setting user data:", error);
+    }
+  },
+
+  async removeUserData(): Promise<void> {
+    try {
+      const AsyncStorage = require("@react-native-async-storage/async-storage").default;
+      await AsyncStorage.removeItem("userData");
+    } catch (error) {
+      console.error("Error removing user data:", error);
+    }
+  },
 };
 
 function serializeHeaders(headers: Headers): Record<string, string> {
@@ -94,6 +123,19 @@ export class ApiClient {
 
   async removeToken(): Promise<void> {
     return TokenStorage.removeToken();
+  }
+
+  // User data management methods
+  async getUserData(): Promise<any | null> {
+    return TokenStorage.getUserData();
+  }
+
+  async setUserData(user: any): Promise<void> {
+    return TokenStorage.setUserData(user);
+  }
+
+  async removeUserData(): Promise<void> {
+    return TokenStorage.removeUserData();
   }
 
   private async getHeaders(): Promise<Record<string, string>> {

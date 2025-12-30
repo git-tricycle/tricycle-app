@@ -1,52 +1,23 @@
-import React, { useState, useEffect } from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  Alert,
-  ActivityIndicator,
-  TextInput,
-  RefreshControl,
-  Platform,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
-import * as ImagePicker from "expo-image-picker";
 import { useAuth } from "@/src/contexts/AuthContext";
+import { useAlert } from "@/src/hooks/useAlert";
+import { useConfirm } from "@/src/hooks/useConfirm";
 import { studentService, type Student } from "@/src/services/student.service";
 import { userService } from "@/src/services/user.service";
-import { PWAInstallButton } from "@/src/components/PWAPrompt";
-
-// Web compatibility utilities
-const showAlert = (title: string, message?: string) => {
-  if (Platform.OS === "web") {
-    window.alert(`${title}${message ? `\n${message}` : ""}`);
-  } else {
-    Alert.alert(title, message);
-  }
-};
-
-const showConfirm = (
-  title: string,
-  message: string,
-  onConfirm: () => void,
-  onCancel?: () => void
-) => {
-  if (Platform.OS === "web") {
-    if (window.confirm(`${title}\n${message}`)) {
-      onConfirm();
-    } else if (onCancel) {
-      onCancel();
-    }
-  } else {
-    Alert.alert(title, message, [
-      { text: "Cancel", style: "cancel", onPress: onCancel },
-      { text: "OK", onPress: onConfirm },
-    ]);
-  }
-};
+import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
+import { router } from "expo-router";
+import React, { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 // Web-compatible TouchableOpacity styling
 const getWebButtonStyle = (className: string) => {
@@ -61,6 +32,27 @@ const getWebButtonStyle = (className: string) => {
 
 export default function StudentProfileScreen() {
   const { user, logout } = useAuth();
+  const { showConfirm, ConfirmModalComponent } = useConfirm();
+  const { showAlert: showAlertModal, AlertModalComponent } = useAlert();
+
+  // Wrapper to support both old and new API
+  const showAlert = async (titleOrOptions: string | any, message?: string) => {
+    if (typeof titleOrOptions === "string") {
+      const type = titleOrOptions.toLowerCase().includes("success")
+        ? "success"
+        : titleOrOptions.toLowerCase().includes("error")
+          ? "error"
+          : "info";
+      await showAlertModal({
+        type,
+        title: titleOrOptions,
+        message: message || "",
+      });
+    } else {
+      await showAlertModal(titleOrOptions);
+    }
+  };
+
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [studentProfile, setStudentProfile] = useState<Student | null>(null);
@@ -131,31 +123,42 @@ export default function StudentProfileScreen() {
           console.log("Student profile not found in user data");
           setStudentProfile(null);
 
-          showConfirm(
-            "Student Profile Required",
-            "You need to create a student profile to access this feature. Would you like to create one now?",
-            () => {
-              setIsEditing(true);
-              setEditableData({
-                studentId: "",
-                course: "",
-                yearLevel: "",
-                schoolEmail: "",
-                emergencyContactName: "",
-                emergencyContactNumber: "",
-                dateOfBirth: "",
-              });
-            }
-          );
+          const confirmed = await showConfirm({
+            title: "Student Profile Required",
+            message:
+              "You need to create a student profile to access this feature. Would you like to create one now?",
+            icon: "school",
+          });
+
+          if (confirmed) {
+            setIsEditing(true);
+            setEditableData({
+              studentId: "",
+              course: "",
+              yearLevel: "",
+              schoolEmail: "",
+              emergencyContactName: "",
+              emergencyContactNumber: "",
+              dateOfBirth: "",
+            });
+          }
         }
       } else {
         console.log("Failed to load user data:", userResponse.message);
-        showAlert("Error", "Failed to load profile data. Please try again.");
+        await showAlert({
+          type: "error",
+          title: "Error",
+          message: "Failed to load profile data. Please try again.",
+        });
       }
     } catch (error) {
       console.error("Error loading profile data:", error);
       if (error instanceof Error && error.message.includes("Network")) {
-        showAlert("Connection Error", "Please check your internet connection and try again.");
+        await showAlert({
+          type: "error",
+          title: "Connection Error",
+          message: "Please check your internet connection and try again.",
+        });
       }
     } finally {
       setIsRefreshing(false);
@@ -203,16 +206,27 @@ export default function StudentProfileScreen() {
           setStudentProfile(response.data || null);
         }
         setIsEditing(false);
-        showAlert(
-          "Success",
-          studentProfile ? "Profile updated successfully!" : "Profile created successfully!"
-        );
+        await showAlert({
+          type: "success",
+          title: "Success",
+          message: studentProfile
+            ? "Profile updated successfully!"
+            : "Profile created successfully!",
+        });
       } else {
-        showAlert("Error", response.message || "Failed to save profile");
+        await showAlert({
+          type: "error",
+          title: "Error",
+          message: response.message || "Failed to save profile",
+        });
       }
     } catch (error) {
       console.error("Error saving profile:", error);
-      showAlert("Error", "Failed to save profile. Please try again.");
+      await showAlert({
+        type: "error",
+        title: "Error",
+        message: "Failed to save profile. Please try again.",
+      });
     } finally {
       setIsUpdating(false);
     }
@@ -249,13 +263,25 @@ export default function StudentProfileScreen() {
       if (response.success) {
         setStudentProfile({ ...studentProfile, ...emergencyContactData });
         setIsEditingEmergencyContact(false);
-        showAlert("Success", "Emergency contact updated successfully!");
+        await showAlert({
+          type: "success",
+          title: "Success",
+          message: "Emergency contact updated successfully!",
+        });
       } else {
-        showAlert("Error", response.message || "Failed to update emergency contact");
+        await showAlert({
+          type: "error",
+          title: "Error",
+          message: response.message || "Failed to update emergency contact",
+        });
       }
     } catch (error) {
       console.error("Error updating emergency contact:", error);
-      showAlert("Error", "Failed to update emergency contact. Please try again.");
+      await showAlert({
+        type: "error",
+        title: "Error",
+        message: "Failed to update emergency contact. Please try again.",
+      });
     } finally {
       setIsUpdating(false);
     }
@@ -362,39 +388,51 @@ export default function StudentProfileScreen() {
       return;
     }
 
-    showConfirm(
-      "Delete Student ID",
-      "Are you sure you want to delete your student ID photo? This will require re-verification.",
-      async () => {
-        try {
-          setIsUploadingDocument(true);
+    const confirmed = await showConfirm({
+      title: "Delete Student ID",
+      message:
+        "Are you sure you want to delete your student ID photo? This will require re-verification.",
+      destructive: true,
+      icon: "trash",
+      confirmText: "Delete",
+    });
 
-          const response = await studentService.deleteStudentIDPhoto(studentProfile.id);
+    if (confirmed) {
+      try {
+        setIsUploadingDocument(true);
 
-          if (response.success && response.data) {
-            setStudentProfile(response.data);
-            showAlert("Success", "Student ID photo deleted successfully");
+        const response = await studentService.deleteStudentIDPhoto(studentProfile.id);
 
-            // Refresh the profile data
-            await loadProfileData();
-          } else {
-            showAlert("Error", response.message || "Failed to delete student ID photo");
-          }
-        } catch (error) {
-          console.error("Error deleting student ID:", error);
-          showAlert("Error", "Failed to delete student ID photo. Please try again.");
-        } finally {
-          setIsUploadingDocument(false);
+        if (response.success && response.data) {
+          setStudentProfile(response.data);
+          showAlert("Success", "Student ID photo deleted successfully");
+
+          // Refresh the profile data
+          await loadProfileData();
+        } else {
+          showAlert("Error", response.message || "Failed to delete student ID photo");
         }
+      } catch (error) {
+        console.error("Error deleting student ID:", error);
+        showAlert("Error", "Failed to delete student ID photo. Please try again.");
+      } finally {
+        setIsUploadingDocument(false);
       }
-    );
+    }
   };
 
-  const handleLogout = () => {
-    showConfirm("Confirm Logout", "Are you sure you want to logout?", async () => {
+  const handleLogout = async () => {
+    const confirmed = await showConfirm({
+      title: "Confirm Logout",
+      message: "Are you sure you want to logout?",
+      icon: "log-out",
+      confirmText: "Logout",
+    });
+
+    if (confirmed) {
       await logout();
       router.replace("/(onboarding)/welcome");
-    });
+    }
   };
 
   const renderProfileField = (
@@ -722,46 +760,13 @@ export default function StudentProfileScreen() {
             )}
           </View>
         </View>
-
-        {/* Account Settings */}
-        <View className="bg-white mx-6 mt-6 mb-6 rounded-2xl p-6 shadow-sm">
-          <Text className="text-black text-lg font-semibold mb-4">Account Settings</Text>
-
-          {Platform.OS === "web" && <PWAInstallButton />}
-
-          <TouchableOpacity className="flex-row items-center justify-between p-4 border-b border-gray-100">
-            <View className="flex-row items-center">
-              <Ionicons name="shield-checkmark" size={20} color="#6b7280" />
-              <Text className="text-black ml-3">Privacy & Security</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#6b7280" />
-          </TouchableOpacity>
-
-          <TouchableOpacity className="flex-row items-center justify-between p-4 border-b border-gray-100">
-            <View className="flex-row items-center">
-              <Ionicons name="notifications" size={20} color="#6b7280" />
-              <Text className="text-black ml-3">Notifications</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#6b7280" />
-          </TouchableOpacity>
-
-          <TouchableOpacity className="flex-row items-center justify-between p-4 border-b border-gray-100">
-            <View className="flex-row items-center">
-              <Ionicons name="help-circle" size={20} color="#6b7280" />
-              <Text className="text-black ml-3">Help & Support</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#6b7280" />
-          </TouchableOpacity>
-
-          <TouchableOpacity className="flex-row items-center justify-between p-4">
-            <View className="flex-row items-center">
-              <Ionicons name="information-circle" size={20} color="#6b7280" />
-              <Text className="text-black ml-3">About</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#6b7280" />
-          </TouchableOpacity>
-        </View>
       </ScrollView>
+
+      {/* Confirmation Modal */}
+      <ConfirmModalComponent />
+
+      {/* Alert Modal */}
+      <AlertModalComponent />
     </SafeAreaView>
   );
 }

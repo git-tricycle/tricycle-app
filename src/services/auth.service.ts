@@ -78,8 +78,9 @@ class AuthService {
       const response = await apiClient.post<AuthResponse>("/auth/register", data);
 
       if (response.success && response.data?.token) {
-        // Store token for future requests
+        // Store token and user data for future requests
         await apiClient.setToken(response.data.token);
+        await apiClient.setUserData(response.data.user);
       }
 
       return response;
@@ -96,8 +97,9 @@ class AuthService {
       const response = await apiClient.post<AuthResponse>("/auth/login", credentials);
 
       if (response.success && response.data?.token) {
-        // Store token for future requests
+        // Store token and user data for future requests
         await apiClient.setToken(response.data.token);
+        await apiClient.setUserData(response.data.user);
       }
 
       return response;
@@ -111,8 +113,9 @@ class AuthService {
    */
   async logout(): Promise<void> {
     try {
-      // Remove stored token
+      // Remove stored token and user data
       await apiClient.removeToken();
+      await apiClient.removeUserData();
     } catch (error) {
       console.error("Logout error:", error);
     }
@@ -136,6 +139,17 @@ class AuthService {
   async getToken(): Promise<string | null> {
     try {
       return await apiClient.getToken();
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /**
+   * Get current user data from storage
+   */
+  async getCurrentUser(): Promise<AuthUser | null> {
+    try {
+      return await apiClient.getUserData();
     } catch (error) {
       return null;
     }

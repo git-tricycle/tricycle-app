@@ -1,9 +1,9 @@
 import { useAuth } from "@/src/contexts/AuthContext";
+import { useAlert } from "@/src/hooks/useAlert";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -13,7 +13,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { showErrorAlert, showSuccessAlert } from "@/src/utils/alerts";
 
 export default function StudentLoginScreen() {
   const [email, setEmail] = useState("");
@@ -23,22 +22,35 @@ export default function StudentLoginScreen() {
   const [isLoading, setIsLoading] = useState(false);
 
   const { login } = useAuth();
+  const { showAlert, AlertModalComponent } = useAlert();
 
   const handleLogin = async () => {
     // Validation
     if (!email.trim()) {
-      showErrorAlert("Validation Error", "Please enter your email address");
+      await showAlert({
+        type: "error",
+        title: "Validation Error",
+        message: "Please enter your email address",
+      });
       return;
     }
 
     if (!password.trim()) {
-      showErrorAlert("Validation Error", "Please enter your password");
+      await showAlert({
+        type: "error",
+        title: "Validation Error",
+        message: "Please enter your password",
+      });
       return;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email.trim())) {
-      showErrorAlert("Invalid Email", "Please enter a valid email address");
+      await showAlert({
+        type: "error",
+        title: "Invalid Email",
+        message: "Please enter a valid email address",
+      });
       return;
     }
 
@@ -50,9 +62,12 @@ export default function StudentLoginScreen() {
         role: "passenger",
       });
 
-      showSuccessAlert("Login Successful", "Welcome back, student!");
-      // Navigation will be handled by the auth context
-      router.replace("/(student)/dashboard");
+      await showAlert({
+        type: "success",
+        title: "Login Successful",
+        message: "Welcome back, student!",
+      });
+      // Navigation will be handled automatically by AuthContext
     } catch (error: any) {
       console.error("Student login error:", error);
 
@@ -70,7 +85,11 @@ export default function StudentLoginScreen() {
         }
       }
 
-      showErrorAlert("Student Login Failed", errorMessage);
+      await showAlert({
+        type: "error",
+        title: "Student Login Failed",
+        message: errorMessage,
+      });
     } finally {
       setIsLoading(false);
     }
@@ -84,14 +103,13 @@ export default function StudentLoginScreen() {
     router.back();
   };
 
-  const handleGoogleLogin = () => {
-    // TODO: Implement Google login
-    showErrorAlert("Feature Coming Soon", "Google login will be available in the next update");
-  };
-
-  const handleForgotPassword = () => {
+  const handleForgotPassword = async () => {
     // TODO: Implement forgot password
-    showErrorAlert("Feature Coming Soon", "Password reset will be available in the next update");
+    await showAlert({
+      type: "info",
+      title: "Feature Coming Soon",
+      message: "Password reset will be available in the next update",
+    });
   };
 
   return (
@@ -118,23 +136,6 @@ export default function StudentLoginScreen() {
 
               <Text className="text-2xl font-bold text-black mb-2">Welcome Back 👋</Text>
               <Text className="text-gray-600 text-center">Please enter your details.</Text>
-            </View>
-
-            {/* Google Login Button */}
-            <TouchableOpacity
-              onPress={handleGoogleLogin}
-              className="flex-row items-center justify-center bg-white border border-gray-300 rounded-xl py-3 mb-6"
-              activeOpacity={0.8}
-            >
-              <Ionicons name="logo-google" size={20} color="#4285F4" />
-              <Text className="ml-3 text-gray-700 font-medium">Log in with Google</Text>
-            </TouchableOpacity>
-
-            {/* Divider */}
-            <View className="flex-row items-center mb-6">
-              <View className="flex-1 h-px bg-gray-300" />
-              <Text className="mx-4 text-gray-500">or</Text>
-              <View className="flex-1 h-px bg-gray-300" />
             </View>
 
             {/* Form */}
@@ -221,6 +222,9 @@ export default function StudentLoginScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Alert Modal */}
+      <AlertModalComponent />
     </SafeAreaView>
   );
 }

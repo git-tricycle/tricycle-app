@@ -14,7 +14,7 @@ export const showAlert = (title: string, message?: string) => {
 
 /**
  * Web-compatible confirmation dialog
- * Shows native Alert with buttons on mobile and window.confirm on web
+ * Shows native Alert with buttons on both mobile and web
  */
 export const showConfirm = (
   title: string,
@@ -22,18 +22,10 @@ export const showConfirm = (
   onConfirm: () => void,
   onCancel?: () => void
 ) => {
-  if (Platform.OS === "web") {
-    if (window.confirm(`${title}\n${message}`)) {
-      onConfirm();
-    } else if (onCancel) {
-      onCancel();
-    }
-  } else {
-    Alert.alert(title, message, [
-      { text: "Cancel", style: "cancel", onPress: onCancel },
-      { text: "OK", onPress: onConfirm },
-    ]);
-  }
+  Alert.alert(title, message, [
+    { text: "Cancel", style: "cancel", onPress: onCancel },
+    { text: "OK", onPress: onConfirm },
+  ]);
 };
 
 /**
@@ -61,18 +53,10 @@ export const showWarningConfirm = (
   confirmText: string = "OK",
   cancelText: string = "Cancel"
 ) => {
-  if (Platform.OS === "web") {
-    if (window.confirm(`⚠️ ${title}\n${message}`)) {
-      onConfirm();
-    } else if (onCancel) {
-      onCancel();
-    }
-  } else {
-    Alert.alert(`⚠️ ${title}`, message, [
-      { text: cancelText, style: "cancel", onPress: onCancel },
-      { text: confirmText, style: "destructive", onPress: onConfirm },
-    ]);
-  }
+  Alert.alert(`⚠️ ${title}`, message, [
+    { text: cancelText, style: "cancel", onPress: onCancel },
+    { text: confirmText, style: "destructive", onPress: onConfirm },
+  ]);
 };
 
 /**

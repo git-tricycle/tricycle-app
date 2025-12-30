@@ -52,8 +52,7 @@ export default function DriverLoginScreen() {
       });
 
       showSuccessAlert("Login Successful", "Welcome back, driver!");
-      // Navigation will be handled by the auth context
-      router.replace("/(driver)/dashboard");
+      // Navigation will be handled automatically by AuthContext
     } catch (error: any) {
       console.error("Driver login error:", error);
 

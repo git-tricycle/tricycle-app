@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { useAuth } from "@/src/contexts/AuthContext";
+import { useConfirm } from "@/src/hooks/useConfirm";
 import { Colors } from "@/src/constants/theme";
 import { PWAInstallButton } from "@/src/components/PWAPrompt";
 
@@ -13,26 +14,6 @@ const showAlert = (title: string, message?: string) => {
     window.alert(`${title}${message ? `\n${message}` : ""}`);
   } else {
     Alert.alert(title, message);
-  }
-};
-
-const showConfirm = (
-  title: string,
-  message: string,
-  onConfirm: () => void,
-  onCancel?: () => void
-) => {
-  if (Platform.OS === "web") {
-    if (window.confirm(`${title}\n${message}`)) {
-      onConfirm();
-    } else if (onCancel) {
-      onCancel();
-    }
-  } else {
-    Alert.alert(title, message, [
-      { text: "Cancel", style: "cancel", onPress: onCancel },
-      { text: "OK", onPress: onConfirm },
-    ]);
   }
 };
 
@@ -49,9 +30,17 @@ const getWebButtonStyle = (className: string) => {
 
 export default function AdminSettingsScreen() {
   const { user, logout } = useAuth();
+  const { showConfirm, ConfirmModalComponent } = useConfirm();
 
-  const handleLogout = () => {
-    showConfirm("Logout", "Are you sure you want to logout?", async () => {
+  const handleLogout = async () => {
+    const confirmed = await showConfirm({
+      title: "Logout",
+      message: "Are you sure you want to logout?",
+      icon: "log-out",
+      confirmText: "Logout",
+    });
+
+    if (confirmed) {
       try {
         await logout();
         // Navigate back to onboarding after logout
@@ -61,7 +50,7 @@ export default function AdminSettingsScreen() {
         // Even if logout fails, navigate away for security
         router.replace("/(onboarding)/role-selection");
       }
-    });
+    }
   };
 
   const SettingsItem = ({
@@ -207,6 +196,9 @@ export default function AdminSettingsScreen() {
           <Text className="text-gray-400 text-xs mt-1">Version 1.0.0</Text>
         </View>
       </ScrollView>
+
+      {/* Confirmation Modal */}
+      <ConfirmModalComponent />
     </SafeAreaView>
   );
 }

@@ -1,4 +1,5 @@
 import React, { createContext, ReactNode, useContext, useEffect, useReducer } from "react";
+import { router, useSegments } from "expo-router";
 import { authService } from "../services/auth.service";
 import {
   AuthContextType,
@@ -62,6 +63,7 @@ interface AuthProviderProps {
 
 export function AuthProvider({ children }: AuthProviderProps) {
   const [state, dispatch] = useReducer(authReducer, initialState);
+  const segments = useSegments();
 
   // Check authentication status on app start
   const checkAuthStatus = async () => {
@@ -71,12 +73,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       if (isAuthenticated) {
         const token = await authService.getToken();
-        if (token) {
-          dispatch({ type: "SET_TOKEN", payload: token });
-          // You might want to fetch user data here
-          // const userData = await authService.getCurrentUser();
-          // dispatch({ type: 'SET_USER', payload: { user: userData, token } });
+        const userData = await authService.getCurrentUser();
+
+        if (token && userData) {
+          dispatch({
+            type: "SET_USER",
+            payload: { user: userData, token },
+          });
+        } else {
+          // Token exists but no user data, clear everything
+          dispatch({ type: "CLEAR_USER" });
         }
+      } else {
+        dispatch({ type: "CLEAR_USER" });
       }
     } catch (error) {
       console.error("Auth check failed:", error);
@@ -100,6 +109,35 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     initAuth();
   }, []);
+
+  // Handle automatic navigation based on auth state
+  useEffect(() => {
+    // Don't navigate while loading or if no user
+    if (state.isLoading || !state.isAuthenticated || !state.user) {
+      return;
+    }
+
+    // Get current route section
+    const inAuthGroup = segments[0] === "(auth)";
+    const inStudentGroup = segments[0] === "(student)";
+    const inAdminGroup = segments[0] === "(admin)";
+    const inDriverGroup = segments[0] === "(driver)";
+
+    // Navigate to appropriate dashboard based on role
+    const role = state.user.role;
+
+    try {
+      if (role === "passenger" && !inStudentGroup) {
+        router.replace("/(student)/dashboard");
+      } else if (role === "admin" && !inAdminGroup) {
+        router.replace("/(admin)/dashboard");
+      } else if (role === "driver" && !inDriverGroup) {
+        router.replace("/(driver)/dashboard");
+      }
+    } catch (error) {
+      console.error("Navigation error:", error);
+    }
+  }, [state.isAuthenticated, state.user, state.isLoading, segments]);
 
   // Login function
   const login = async (credentials: LoginCredentials) => {
