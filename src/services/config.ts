@@ -12,11 +12,11 @@ export const API_CONFIG = {
 
 // Auto-detect the best configuration
 export const getApiBaseUrl = (): string => {
-  if (__DEV__) {
-    // Since you're using exp://192.168.1.6:8081, you're likely on a physical device
-    // or using the network interface, so we'll use the physical device config
-    return API_CONFIG.PHYSICAL_DEVICE; // Using your network IP
-  }
+  // if (__DEV__) {
+  //   // Since you're using exp://192.168.1.6:8081, you're likely on a physical device
+  //   // or using the network interface, so we'll use the physical device config
+  //   return API_CONFIG.PHYSICAL_DEVICE; // Using your network IP
+  // }
 
   return API_CONFIG.PRODUCTION;
 };
