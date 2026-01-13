@@ -48,7 +48,8 @@ class SocketService {
 
       // Determine the API URL
       const API_URL =
-        process.env.EXPO_PUBLIC_API_URL || "http://localhost:5000";
+        process.env.EXPO_PUBLIC_API_URL ||
+        "https://tricycle-api-d5e16195c414.herokuapp.com/api";
       const socketUrl = API_URL.replace(/\/api$/, ""); // Remove /api if present
 
       console.log("Connecting to Socket.IO server:", socketUrl);
@@ -110,7 +111,8 @@ class SocketService {
 
     try {
       const API_URL =
-        process.env.EXPO_PUBLIC_API_URL || "http://localhost:5000";
+        process.env.EXPO_PUBLIC_API_URL ||
+        "https://tricycle-api-d5e16195c414.herokuapp.com/api";
       const socketUrl = API_URL.replace(/\/api$/, "");
 
       console.log("Connecting to Socket.IO server with share token");
