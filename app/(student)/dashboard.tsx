@@ -2,7 +2,13 @@ import { useAuth } from "@/src/contexts/AuthContext";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { ScrollView, Text, TouchableOpacity, View, ActivityIndicator } from "react-native";
+import {
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+  ActivityIndicator,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { rideService, Ride } from "@/src/services/ride.service";
 
@@ -72,7 +78,9 @@ export default function StudentDashboard() {
         {/* Quick Actions */}
         <View className="px-6 -mt-6">
           <View className="bg-white rounded-2xl p-6 shadow-sm">
-            <Text className="text-black text-lg font-semibold mb-4">Quick Actions</Text>
+            <Text className="text-black text-lg font-semibold mb-4">
+              Quick Actions
+            </Text>
 
             <TouchableOpacity
               onPress={handleBookRide}
@@ -84,8 +92,12 @@ export default function StudentDashboard() {
                   <Ionicons name="car" size={24} color="white" />
                 </View>
                 <View className="flex-1">
-                  <Text className="text-white font-semibold text-lg">Book a Ride</Text>
-                  <Text className="text-white/80">Find a tricycle near you</Text>
+                  <Text className="text-white font-semibold text-lg">
+                    Book a Ride
+                  </Text>
+                  <Text className="text-white/80">
+                    Find a tricycle near you
+                  </Text>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color="white" />
               </View>
@@ -121,13 +133,17 @@ export default function StudentDashboard() {
         <View className="px-6 mt-6">
           <View className="bg-white rounded-2xl p-2 shadow-sm">
             <View className="mb-4">
-              <Text className="text-black text-lg font-semibold">Recent Activity</Text>
+              <Text className="text-black text-lg font-semibold">
+                Recent Activity
+              </Text>
             </View>
 
             {loadingRecent ? (
               <View className="border border-gray-200 rounded-xl p-4 mb-3 items-center">
                 <ActivityIndicator size="small" color="#000" />
-                <Text className="text-gray-500 text-sm mt-2">Loading recent activity...</Text>
+                <Text className="text-gray-500 text-sm mt-2">
+                  Loading recent activity...
+                </Text>
               </View>
             ) : recentRides.length > 0 ? (
               <View className="border border-gray-200 rounded-xl p-4 mb-3">
@@ -181,7 +197,9 @@ export default function StudentDashboard() {
                     const date = new Date(dateString);
                     const now = new Date();
                     const diffTime = Math.abs(now.getTime() - date.getTime());
-                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    const diffDays = Math.ceil(
+                      diffTime / (1000 * 60 * 60 * 24),
+                    );
 
                     if (diffDays === 1) return "Today";
                     if (diffDays === 2) return "Yesterday";
@@ -192,23 +210,33 @@ export default function StudentDashboard() {
                     <View key={ride.id}>
                       <View className="flex-row justify-between items-start mb-2">
                         <View className="flex-row items-center">
-                          <View className={`w-2 h-2 ${getStatusColor()} rounded-full mr-2`} />
-                          <Text className={`${getStatusTextColor()} font-medium text-sm`}>
+                          <View
+                            className={`w-2 h-2 ${getStatusColor()} rounded-full mr-2`}
+                          />
+                          <Text
+                            className={`${getStatusTextColor()} font-medium text-sm`}
+                          >
                             {getStatusText()}
                           </Text>
                         </View>
-                        <Text className="text-gray-500 text-sm">{formatDate(ride.createdAt)}</Text>
+                        <Text className="text-gray-500 text-sm">
+                          {formatDate(ride.createdAt)}
+                        </Text>
                       </View>
 
                       <View className="mb-2">
                         <View className="flex-row items-center mb-1">
                           <View className="w-2 h-2 bg-green-500 rounded-full mr-3" />
-                          <Text className="text-gray-800 text-sm flex-1">{ride.pickup}</Text>
+                          <Text className="text-gray-800 text-sm flex-1">
+                            {ride.pickup}
+                          </Text>
                         </View>
                         <View className="ml-5 border-l border-dashed border-gray-300 h-3" />
                         <View className="flex-row items-center">
                           <View className="w-2 h-2 bg-red-500 rounded-full mr-3" />
-                          <Text className="text-gray-800 text-sm flex-1">{ride.dropoff}</Text>
+                          <Text className="text-gray-800 text-sm flex-1">
+                            {ride.dropoff}
+                          </Text>
                         </View>
                       </View>
 
@@ -219,7 +247,9 @@ export default function StudentDashboard() {
                             : "No driver"}{" "}
                           • {ride.paymentMode}
                         </Text>
-                        <Text className="text-black font-semibold">₱{ride.fare}</Text>
+                        <Text className="text-black font-semibold">
+                          ₱{ride.fare}
+                        </Text>
                       </View>
                     </View>
                   );
@@ -228,7 +258,9 @@ export default function StudentDashboard() {
             ) : (
               <View className="border border-gray-200 rounded-xl p-4 mb-3 items-center">
                 <Ionicons name="car-outline" size={24} color="#9CA3AF" />
-                <Text className="text-gray-500 text-sm mt-2">No recent rides</Text>
+                <Text className="text-gray-500 text-sm mt-2">
+                  No recent rides
+                </Text>
               </View>
             )}
 
@@ -237,7 +269,9 @@ export default function StudentDashboard() {
               className="bg-gray-50 border border-dashed border-gray-300 rounded-xl p-4 items-center"
             >
               <Ionicons name="add" size={24} color="#6b7280" />
-              <Text className="text-gray-600 text-sm mt-1">Book Another Ride</Text>
+              <Text className="text-gray-600 text-sm mt-1">
+                Book Another Ride
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -245,26 +279,20 @@ export default function StudentDashboard() {
         {/* Safety Features */}
         <View className="px-6 mt-6 mb-6">
           <View className="bg-white rounded-2xl p-6 shadow-sm">
-            <Text className="text-black text-lg font-semibold mb-4">Safety Features</Text>
+            <Text className="text-black text-lg font-semibold mb-4">
+              Safety Features
+            </Text>
 
             <View className="space-y-3 gap-5">
-              <View className="flex-row items-center">
-                <View className="w-10 h-10 bg-gray-200 rounded-full items-center justify-center mr-4">
-                  <Ionicons name="alert-circle" size={20} color="#000000" />
-                </View>
-                <View className="flex-1">
-                  <Text className="text-black font-medium">SOS Button</Text>
-                  <Text className="text-gray-500 text-sm">Emergency alert system</Text>
-                </View>
-              </View>
-
               <View className="flex-row items-center">
                 <View className="w-10 h-10 bg-gray-200 rounded-full items-center justify-center mr-4">
                   <Ionicons name="share" size={20} color="#000000" />
                 </View>
                 <View className="flex-1">
                   <Text className="text-black font-medium">Share Trip</Text>
-                  <Text className="text-gray-500 text-sm">Share live location with contacts</Text>
+                  <Text className="text-gray-500 text-sm">
+                    Share live location with contacts
+                  </Text>
                 </View>
               </View>
 
@@ -273,8 +301,12 @@ export default function StudentDashboard() {
                   <Ionicons name="shield-checkmark" size={20} color="#000000" />
                 </View>
                 <View className="flex-1">
-                  <Text className="text-black font-medium">Verified Drivers</Text>
-                  <Text className="text-gray-500 text-sm">All drivers are background checked</Text>
+                  <Text className="text-black font-medium">
+                    Verified Drivers
+                  </Text>
+                  <Text className="text-gray-500 text-sm">
+                    All drivers are background checked
+                  </Text>
                 </View>
               </View>
             </View>

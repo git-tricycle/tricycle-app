@@ -1,11 +1,16 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useMemo,
+  useCallback,
+} from "react";
 import {
   View,
   Text,
   TouchableOpacity,
-  Alert,
   ActivityIndicator,
   ScrollView,
   Modal,
@@ -13,13 +18,25 @@ import {
   Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import MapView, { Location, MapViewRef, MapPolyline } from "@/src/components/ui/MapView";
+import MapView, {
+  Location,
+  MapViewRef,
+  MapPolyline,
+} from "@/src/components/ui/MapView";
 import LocationPicker from "@/src/components/ui/LocationPicker";
+import ShareTripModal from "@/src/components/ShareTripModal";
 import { useAuth } from "@/src/contexts/AuthContext";
 import { rideService } from "@/src/services/ride.service";
 import { driverService } from "@/src/services/driver.service";
 import { getRouteBetween } from "@/src/services/directions.service";
 import { fareService } from "@/src/services/fare.service";
+import {
+  socketService,
+  type RideLocationUpdate,
+  type RideStatusUpdate,
+} from "@/src/services";
+import { AlertModal, type AlertType } from "@/src/components/AlertModal";
+import { ConfirmModal } from "@/src/components/ConfirmModal";
 
 type BookingStep =
   | "location-selection"
@@ -49,19 +66,26 @@ export default function BookRideScreen() {
     if (Platform.OS === "web") {
       return require("@/assets/images/motorbike.png");
     }
-    return Image.resolveAssetSource(require("@/assets/images/motorbike.png")).uri;
+    return Image.resolveAssetSource(require("@/assets/images/motorbike.png"))
+      .uri;
   }, []);
 
   // Booking state
-  const [currentStep, setCurrentStep] = useState<BookingStep>("location-selection");
-  const [pickupLocation, setPickupLocation] = useState<BookingLocation | null>(null);
-  const [dropoffLocation, setDropoffLocation] = useState<BookingLocation | null>(null);
+  const [currentStep, setCurrentStep] =
+    useState<BookingStep>("location-selection");
+  const [pickupLocation, setPickupLocation] = useState<BookingLocation | null>(
+    null,
+  );
+  const [dropoffLocation, setDropoffLocation] =
+    useState<BookingLocation | null>(null);
   const [estimatedFare, setEstimatedFare] = useState<number | null>(null);
-  const [selectedPaymentMode, setSelectedPaymentMode] = useState<"cash" | "gcash">("cash");
+  const [selectedPaymentMode] = useState<"cash">("cash");
 
   // Location picker state
   const [showLocationPicker, setShowLocationPicker] = useState(false);
-  const [locationPickerType, setLocationPickerType] = useState<"pickup" | "dropoff">("pickup");
+  const [locationPickerType, setLocationPickerType] = useState<
+    "pickup" | "dropoff"
+  >("pickup");
 
   // Driver search state
   const [isSearchingDriver, setIsSearchingDriver] = useState(false);
@@ -71,9 +95,39 @@ export default function BookRideScreen() {
   // Ride state
   const [currentRide, setCurrentRide] = useState<any>(null);
   const [rideStatus, setRideStatus] = useState<string>("");
-  const [isPollingRide, setIsPollingRide] = useState(false);
+  const [isConnectedToSocket, setIsConnectedToSocket] = useState(false);
   const [routePolylines, setRoutePolylines] = useState<MapPolyline[]>([]);
   const lastRouteKeyRef = useRef<string | null>(null);
+  const lastDriverLocationRef = useRef<Location | null>(null);
+
+  // Share Trip state
+  const [showShareModal, setShowShareModal] = useState(false);
+
+  // Alert modal state
+  const [alertConfig, setAlertConfig] = useState<{
+    visible: boolean;
+    type: AlertType;
+    title: string;
+    message: string;
+  }>({
+    visible: false,
+    type: "info",
+    title: "",
+    message: "",
+  });
+
+  // Confirmation modal state
+  const [confirmConfig, setConfirmConfig] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({
+    visible: false,
+    title: "",
+    message: "",
+    onConfirm: () => {},
+  });
 
   // Calculate estimated fare when locations are set
   useEffect(() => {
@@ -94,7 +148,7 @@ export default function BookRideScreen() {
     }
   }, []); // Run only on mount
 
-  // Poll ride status once a ride exists until it is completed or cancelled
+  // Socket.IO real-time ride updates - replaces polling
   useEffect(() => {
     if (!currentRide?.id) {
       return;
@@ -104,58 +158,90 @@ export default function BookRideScreen() {
       currentRide.status === "completed" || currentRide.status === "cancelled";
 
     if (isTerminalStatus) {
-      setIsPollingRide(false);
+      setIsConnectedToSocket(false);
       return;
     }
 
-    setIsPollingRide(true);
+    let isActive = true;
 
-    // Aggressive polling to detect cancellations immediately (every 3 seconds)
-    const interval = setInterval(async () => {
+    // Connect to Socket.IO and join ride room
+    const connectAndJoinRide = async () => {
       try {
-        const response = await rideService.getRideById(currentRide.id);
-        if (response.success && response.data) {
-          // Check if driver cancelled the ride
-          if (response.data.status === "cancelled" && currentRide.status !== "cancelled") {
-            await handleRideStatusUpdate(response.data);
-            // Show cancellation alert
-            if (Platform.OS === "web") {
-              alert(
-                "Ride Cancelled: The driver has cancelled this ride. Please book another ride."
-              );
-              setCurrentStep("location-selection");
-              resetRideState();
-            } else {
-              Alert.alert(
-                "Ride Cancelled",
-                "The driver has cancelled this ride. Please book another ride.",
-                [
-                  {
-                    text: "OK",
-                    onPress: () => {
-                      setCurrentStep("location-selection");
-                      resetRideState();
-                    },
-                  },
-                ]
-              );
-            }
-            return;
-          }
-
-          // Handle other status updates
-          await handleRideStatusUpdate(response.data);
+        // Connect to socket if not already connected
+        if (!socketService.isConnected()) {
+          await socketService.connect();
         }
+
+        if (!isActive) return;
+
+        // Join the ride room
+        socketService.joinRide(currentRide.id);
+        setIsConnectedToSocket(true);
+
+        // Listen for location updates
+        const handleLocationUpdate = (data: RideLocationUpdate) => {
+          if (data.rideId === currentRide.id && isActive) {
+            console.log("Real-time location update:", data.location);
+            updateDriverLocationOnMap(data.location);
+          }
+        };
+
+        // Listen for status updates
+        const handleStatusUpdate = async (data: RideStatusUpdate) => {
+          if (data.rideId === currentRide.id && isActive) {
+            console.log("Real-time status update:", data.status);
+
+            // Fetch updated ride data
+            const response = await rideService.getRideById(currentRide.id);
+            if (response.success && response.data && isActive) {
+              // Check if driver cancelled the ride
+              if (
+                data.status === "cancelled" &&
+                currentRide.status !== "cancelled"
+              ) {
+                await handleRideStatusUpdate(response.data);
+                // Show cancellation alert
+                showAlert(
+                  "Ride Cancelled",
+                  "The driver has cancelled this ride. Please book another ride.",
+                  "warning",
+                );
+                setCurrentStep("location-selection");
+                resetRideState();
+                return;
+              }
+
+              // Handle other status updates
+              await handleRideStatusUpdate(response.data);
+            }
+          }
+        };
+
+        // Subscribe to events
+        socketService.on("ride:location:update", handleLocationUpdate);
+        socketService.on("ride:status:update", handleStatusUpdate);
+
+        // Cleanup function
+        return () => {
+          isActive = false;
+          socketService.off("ride:location:update", handleLocationUpdate);
+          socketService.off("ride:status:update", handleStatusUpdate);
+          socketService.leaveRide(currentRide.id);
+          setIsConnectedToSocket(false);
+        };
       } catch (error) {
-        console.error("Failed to poll ride status:", error);
+        console.error("Failed to connect to Socket.IO:", error);
+        setIsConnectedToSocket(false);
       }
-    }, 3000); // Check every 3 seconds for real-time cancellation updates
+    };
+
+    const cleanup = connectAndJoinRide();
 
     return () => {
-      clearInterval(interval);
-      setIsPollingRide(false);
+      isActive = false;
+      cleanup.then((cleanupFn) => cleanupFn?.());
     };
-  }, [currentRide?.id, currentRide?.status]);
+  }, [currentRide?.id]);
 
   const calculateEstimatedFare = async () => {
     try {
@@ -164,7 +250,10 @@ export default function BookRideScreen() {
 
       // Try to get actual route distance first
       try {
-        const routeCoordinates = await getRouteBetween(pickupLocation!, dropoffLocation!);
+        const routeCoordinates = await getRouteBetween(
+          pickupLocation!,
+          dropoffLocation!,
+        );
 
         if (routeCoordinates.length > 1) {
           // Calculate distance along the actual route
@@ -177,14 +266,19 @@ export default function BookRideScreen() {
           estimatedTime = Math.max(3, Math.ceil((distance / 28) * 60 + 2));
         }
       } catch (routeError) {
-        console.warn("Route calculation failed, using straight-line distance:", routeError);
+        console.warn(
+          "Route calculation failed, using straight-line distance:",
+          routeError,
+        );
         // Fallback to straight-line distance
         distance = calculateDistance(pickupLocation!, dropoffLocation!);
         estimatedTime = Math.max(3, Math.ceil((distance / 28) * 60 + 2));
       }
 
       // Call API with distance and estimated time
-      const response = await fareService.calculateFare(distance, { estimatedTime });
+      const response = await fareService.calculateFare(distance, {
+        estimatedTime,
+      });
 
       if (response.success && response.data) {
         setEstimatedFare(Math.round(response.data.calculatedFare));
@@ -206,7 +300,10 @@ export default function BookRideScreen() {
     }
   };
 
-  const calculateDistance = (location1: Location, location2: Location): number => {
+  const calculateDistance = (
+    location1: Location,
+    location2: Location,
+  ): number => {
     // Haversine formula for distance calculation
     const R = 6371; // Earth's radius in km
     const dLat = ((location2.latitude - location1.latitude) * Math.PI) / 180;
@@ -218,7 +315,18 @@ export default function BookRideScreen() {
         Math.sin(dLon / 2) *
         Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
+    return R * c; // Distance in km
+  };
+
+  const hasLocationChangedSignificantly = (
+    oldLocation: Location | null,
+    newLocation: Location,
+  ): boolean => {
+    if (!oldLocation) return true;
+
+    const distance = calculateDistance(oldLocation, newLocation);
+    // Only update if driver moved more than 10 meters (0.01 km)
+    return distance > 0.01;
   };
 
   const calculateRouteDistance = (coordinates: Location[]): number => {
@@ -229,7 +337,10 @@ export default function BookRideScreen() {
     return totalDistance;
   };
 
-  const calculateETA = (currentLocation: Location, destinationLocation: Location): number => {
+  const calculateETA = (
+    currentLocation: Location,
+    destinationLocation: Location,
+  ): number => {
     // Calculate distance between current and destination
     const distance = calculateDistance(currentLocation, destinationLocation);
     // Average tricycle speed: 28 km/h
@@ -257,12 +368,30 @@ export default function BookRideScreen() {
     setShowLocationPicker(false);
   };
 
-  const showAlert = (title: string, message: string) => {
-    if (Platform.OS === "web") {
-      alert(`${title}: ${message}`);
-    } else {
-      Alert.alert(title, message);
-    }
+  const showAlert = (
+    title: string,
+    message: string,
+    type: AlertType = "info",
+  ) => {
+    setAlertConfig({
+      visible: true,
+      type,
+      title,
+      message,
+    });
+  };
+
+  const showConfirm = (
+    title: string,
+    message: string,
+    onConfirm: () => void,
+  ) => {
+    setConfirmConfig({
+      visible: true,
+      title,
+      message,
+      onConfirm,
+    });
   };
 
   const searchForDrivers = async () => {
@@ -300,7 +429,10 @@ export default function BookRideScreen() {
           if (driver.location && pickupLocation) {
             const distance = calculateDistance(driver.location, pickupLocation);
             const avgSpeed = 28; // km/h
-            estimatedArrival = Math.max(3, Math.ceil((distance / avgSpeed) * 60 + 2)); // min
+            estimatedArrival = Math.max(
+              3,
+              Math.ceil((distance / avgSpeed) * 60 + 2),
+            ); // min
           }
 
           return {
@@ -324,7 +456,8 @@ export default function BookRideScreen() {
       } else {
         showAlert(
           "No Drivers Available",
-          "Sorry, there are no available drivers in your area at the moment. Please try again later."
+          "Sorry, there are no available drivers in your area at the moment. Please try again later.",
+          "warning",
         );
         setCurrentStep("location-selection");
       }
@@ -332,7 +465,8 @@ export default function BookRideScreen() {
       console.error("Error searching for drivers:", error);
       showAlert(
         "Error",
-        "Failed to find available drivers. Please check your internet connection and try again."
+        "Failed to find available drivers. Please check your internet connection and try again.",
+        "error",
       );
       setCurrentStep("location-selection");
     } finally {
@@ -359,10 +493,10 @@ export default function BookRideScreen() {
         setCurrentStep("awaiting-driver");
         setRideStatus("Waiting for driver to accept your request...");
       } else {
-        showAlert("Error", response.message || "Failed to book ride");
+        showAlert("Error", response.message || "Failed to book ride", "error");
       }
     } catch (error) {
-      showAlert("Error", "Failed to book ride. Please try again.");
+      showAlert("Error", "Failed to book ride. Please try again.", "error");
       console.error("Booking error:", error);
     }
   };
@@ -404,7 +538,7 @@ export default function BookRideScreen() {
     ride: any,
     options: {
       forceRefresh?: boolean;
-    } = {}
+    } = {},
   ) {
     const { forceRefresh = false } = options;
 
@@ -414,6 +548,8 @@ export default function BookRideScreen() {
       }
 
       const existingDriverIsMatch = selectedDriver?.id === ride.driverId;
+
+      // Don't refresh if driver hasn't changed and location exists
       if (!forceRefresh && existingDriverIsMatch && selectedDriver?.location) {
         return;
       }
@@ -432,7 +568,7 @@ export default function BookRideScreen() {
           "user.location.longitude",
           "vehicle.plateNumber",
           "vehicle.bodyNumber",
-        ].join(",")
+        ].join(","),
       );
 
       if (!driverProfileResponse.success || !driverProfileResponse.data) {
@@ -447,29 +583,97 @@ export default function BookRideScreen() {
           }`.trim();
 
       const fallbackLocation = pickupLocation
-        ? { latitude: pickupLocation.latitude, longitude: pickupLocation.longitude }
+        ? {
+            latitude: pickupLocation.latitude,
+            longitude: pickupLocation.longitude,
+          }
         : { latitude: 13.92077, longitude: 122.09891 };
 
-      setSelectedDriver({
-        id: ride.driverId,
-        name: driverName,
-        rating: selectedDriver?.rating || 4.8,
-        vehicleNumber:
-          driverProfile?.vehicle?.plateNumber ||
-          driverProfile?.vehicle?.bodyNumber ||
-          selectedDriver?.vehicleNumber ||
-          "N/A",
-        estimatedArrival: selectedDriver?.estimatedArrival || ride.eta || 0,
-        location: driverProfile?.user?.location
-          ? {
-              latitude: driverProfile.user.location.latitude,
-              longitude: driverProfile.user.location.longitude,
-            }
-          : selectedDriver?.location || fallbackLocation,
-        photo: selectedDriver?.photo,
-      });
+      const newLocation = driverProfile?.user?.location
+        ? {
+            latitude: driverProfile.user.location.latitude,
+            longitude: driverProfile.user.location.longitude,
+          }
+        : selectedDriver?.location || fallbackLocation;
+
+      // Only update if location changed significantly (> 10 meters)
+      const shouldUpdate = hasLocationChangedSignificantly(
+        lastDriverLocationRef.current,
+        newLocation,
+      );
+
+      if (shouldUpdate) {
+        lastDriverLocationRef.current = newLocation;
+        setSelectedDriver({
+          id: ride.driverId,
+          name: driverName,
+          rating: selectedDriver?.rating || 4.8,
+          vehicleNumber:
+            driverProfile?.vehicle?.plateNumber ||
+            driverProfile?.vehicle?.bodyNumber ||
+            selectedDriver?.vehicleNumber ||
+            "N/A",
+          estimatedArrival: selectedDriver?.estimatedArrival || ride.eta || 0,
+          location: newLocation,
+          photo: selectedDriver?.photo,
+        });
+      }
     } catch (error) {
       console.error("Failed to enrich driver details:", error);
+    }
+  }
+
+  // Update driver location on map from real-time Socket.IO updates
+  function updateDriverLocationOnMap(location: Location) {
+    if (!location || !pickupLocation || !dropoffLocation) {
+      return;
+    }
+
+    // Check if location changed significantly (> 10 meters)
+    const shouldUpdate = hasLocationChangedSignificantly(
+      lastDriverLocationRef.current,
+      location,
+    );
+
+    if (!shouldUpdate) {
+      return;
+    }
+
+    lastDriverLocationRef.current = location;
+
+    // Update selected driver location
+    if (selectedDriver) {
+      setSelectedDriver({
+        ...selectedDriver,
+        location: location,
+        estimatedArrival: calculateETA(location, pickupLocation),
+      });
+    }
+
+    // Update route polylines if needed
+    const routeKey = `${location.latitude}-${location.longitude}-${pickupLocation.latitude}-${pickupLocation.longitude}`;
+
+    if (lastRouteKeyRef.current !== routeKey) {
+      lastRouteKeyRef.current = routeKey;
+
+      // Debounce route calculation
+      setTimeout(async () => {
+        try {
+          const route = await getRouteBetween(location, pickupLocation);
+          if (route && route.length > 0) {
+            setRoutePolylines([
+              {
+                id: "driver-to-pickup",
+                path: route,
+                color: "#000000",
+                weight: 4,
+              },
+            ]);
+          }
+        } catch (error) {
+          console.error("Failed to update route:", error);
+        }
+      }, 1000);
     }
   }
 
@@ -485,6 +689,7 @@ export default function BookRideScreen() {
     setIsSearchingDriver(false);
     setAvailableDrivers([]);
     lastRouteKeyRef.current = null;
+    lastDriverLocationRef.current = null;
   }
 
   const cancelRide = () => {
@@ -501,21 +706,11 @@ export default function BookRideScreen() {
       }
     };
 
-    if (Platform.OS === "web") {
-      const confirmed = confirm("Are you sure you want to cancel this ride?");
-      if (confirmed) {
-        performCancel();
-      }
-    } else {
-      Alert.alert("Cancel Ride", "Are you sure you want to cancel this ride?", [
-        { text: "No", style: "cancel" },
-        {
-          text: "Yes",
-          style: "destructive",
-          onPress: performCancel,
-        },
-      ]);
-    }
+    showConfirm(
+      "Cancel Ride",
+      "Are you sure you want to cancel this ride?",
+      performCancel,
+    );
   };
 
   const renderAwaitingDriverStep = () => (
@@ -525,15 +720,19 @@ export default function BookRideScreen() {
         Waiting for driver confirmation
       </Text>
       <Text className="text-gray-600 text-center">
-        We&apos;ve sent your ride request to {selectedDriver?.name || "the driver"}. You&apos;ll be
-        notified once they accept.
+        We&apos;ve sent your ride request to{" "}
+        {selectedDriver?.name || "the driver"}. You&apos;ll be notified once
+        they accept.
       </Text>
       <View className="mt-6">
         <Text className="text-gray-500 text-sm text-center">{rideStatus}</Text>
-        {isPollingRide && (
-          <Text className="text-gray-400 text-xs text-center mt-2">
-            Updating ride status every few seconds...
-          </Text>
+        {isConnectedToSocket && (
+          <View className="flex-row items-center justify-center mt-2">
+            <View className="w-2 h-2 rounded-full bg-green-500 mr-2" />
+            <Text className="text-gray-400 text-xs text-center">
+              Real-time tracking active
+            </Text>
+          </View>
         )}
       </View>
       <TouchableOpacity
@@ -585,7 +784,9 @@ export default function BookRideScreen() {
         <TouchableOpacity
           onPress={() => handleLocationSelect("pickup")}
           className="bg-gray-50 rounded-xl p-4 mb-3 border border-gray-200"
-          style={Platform.OS === "web" ? ({ cursor: "pointer" } as any) : undefined}
+          style={
+            Platform.OS === "web" ? ({ cursor: "pointer" } as any) : undefined
+          }
         >
           <View className="flex-row items-center">
             <View className="w-3 h-3 bg-green-500 rounded-full mr-3" />
@@ -603,7 +804,9 @@ export default function BookRideScreen() {
         <TouchableOpacity
           onPress={() => handleLocationSelect("dropoff")}
           className="bg-gray-50 rounded-xl p-4 mb-4 border border-gray-200"
-          style={Platform.OS === "web" ? ({ cursor: "pointer" } as any) : undefined}
+          style={
+            Platform.OS === "web" ? ({ cursor: "pointer" } as any) : undefined
+          }
         >
           <View className="flex-row items-center">
             <View className="w-3 h-3 bg-red-500 rounded-full mr-3" />
@@ -622,44 +825,18 @@ export default function BookRideScreen() {
           <View className="mb-4">
             <View className="flex-row items-center justify-between mb-3">
               <Text className="text-black font-medium">Estimated Fare:</Text>
-              <Text className="text-black font-bold text-lg">₱{estimatedFare}</Text>
+              <Text className="text-black font-bold text-lg">
+                ₱{estimatedFare}
+              </Text>
             </View>
 
-            {/* Payment Mode Selection */}
-            <View className="flex-row space-x-3 gap-3">
-              <TouchableOpacity
-                onPress={() => setSelectedPaymentMode("cash")}
-                className={`flex-1 p-3 rounded-lg border ${
-                  selectedPaymentMode === "cash"
-                    ? "bg-black border-black"
-                    : "bg-white border-gray-300"
-                }`}
-              >
-                <Text
-                  className={`text-center font-medium ${
-                    selectedPaymentMode === "cash" ? "text-white" : "text-black"
-                  }`}
-                >
-                  Cash
+            {/* Payment Mode - Cash Only */}
+            <View className="p-4 rounded-lg border border-gray-300 bg-gray-50">
+              <View className="flex-row items-center justify-center">
+                <Text className="text-gray-700 font-medium">
+                  Payment Method: Cash
                 </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => setSelectedPaymentMode("gcash")}
-                className={`flex-1 p-3 rounded-lg border ${
-                  selectedPaymentMode === "gcash"
-                    ? "bg-black border-black"
-                    : "bg-white border-gray-300"
-                }`}
-              >
-                <Text
-                  className={`text-center font-medium ${
-                    selectedPaymentMode === "gcash" ? "text-white" : "text-black"
-                  }`}
-                >
-                  GCash
-                </Text>
-              </TouchableOpacity>
+              </View>
             </View>
           </View>
         )}
@@ -674,7 +851,9 @@ export default function BookRideScreen() {
           style={
             Platform.OS === "web"
               ? ({
-                  cursor: (pickupLocation && dropoffLocation ? "pointer" : "not-allowed") as any,
+                  cursor: (pickupLocation && dropoffLocation
+                    ? "pointer"
+                    : "not-allowed") as any,
                   userSelect: "none" as any,
                   outline: "none" as any,
                 } as any)
@@ -718,7 +897,9 @@ export default function BookRideScreen() {
   const renderDriverFoundStep = () => (
     <View className="flex-1 bg-white">
       <View className="p-6 border-b border-gray-200">
-        <Text className="text-black text-lg font-semibold mb-2">Available Drivers</Text>
+        <Text className="text-black text-lg font-semibold mb-2">
+          Available Drivers
+        </Text>
         <Text className="text-gray-600">Choose your preferred driver</Text>
       </View>
 
@@ -769,7 +950,8 @@ export default function BookRideScreen() {
 
   const updateRoutePolylines = useCallback(
     async (driverLocationOverride?: Location) => {
-      const driverLoc = driverLocationOverride || selectedDriver?.location || null;
+      const driverLoc =
+        driverLocationOverride || selectedDriver?.location || null;
 
       const segments: Array<{
         id: string;
@@ -779,7 +961,11 @@ export default function BookRideScreen() {
         weight: number;
       }> = [];
 
-      if (driverLoc && pickupLocation && currentRide?.status !== "in_progress") {
+      if (
+        driverLoc &&
+        pickupLocation &&
+        currentRide?.status !== "in_progress"
+      ) {
         segments.push({
           id: "driver-to-pickup",
           from: driverLoc,
@@ -799,7 +985,11 @@ export default function BookRideScreen() {
         });
       }
 
-      if (driverLoc && dropoffLocation && currentRide?.status === "in_progress") {
+      if (
+        driverLoc &&
+        dropoffLocation &&
+        currentRide?.status === "in_progress"
+      ) {
         segments.push({
           id: "driver-to-dropoff",
           from: driverLoc,
@@ -819,7 +1009,7 @@ export default function BookRideScreen() {
       const routeKey = segments
         .map(
           (segment) =>
-            `${segment.id}:${rounded(segment.from.latitude)},${rounded(segment.from.longitude)}->${rounded(segment.to.latitude)},${rounded(segment.to.longitude)}`
+            `${segment.id}:${rounded(segment.from.latitude)},${rounded(segment.from.longitude)}->${rounded(segment.to.latitude)},${rounded(segment.to.longitude)}`,
         )
         .join("|");
 
@@ -839,18 +1029,31 @@ export default function BookRideScreen() {
             color: segment.color,
             weight: segment.weight,
           } as MapPolyline;
-        })
+        }),
       );
 
-      const validRoutes = routes.filter((route): route is MapPolyline => Boolean(route));
+      const validRoutes = routes.filter((route): route is MapPolyline =>
+        Boolean(route),
+      );
       setRoutePolylines(validRoutes);
       lastRouteKeyRef.current = routeKey;
     },
-    [currentRide?.status, dropoffLocation, pickupLocation, selectedDriver?.location]
+    [
+      currentRide?.status,
+      dropoffLocation,
+      pickupLocation,
+      selectedDriver?.location,
+    ],
   );
 
+  // Debounced route update - only update when necessary
   useEffect(() => {
-    updateRoutePolylines();
+    // Add debounce to prevent excessive updates
+    const timeoutId = setTimeout(() => {
+      updateRoutePolylines();
+    }, 1000); // Wait 1 second before updating routes
+
+    return () => clearTimeout(timeoutId);
   }, [
     selectedDriver?.location,
     pickupLocation,
@@ -862,7 +1065,10 @@ export default function BookRideScreen() {
   const renderRideTrackingStep = () => {
     const fallbackCenter = { latitude: 13.92077, longitude: 122.09891 };
     const mapCenter =
-      selectedDriver?.location || pickupLocation || dropoffLocation || fallbackCenter;
+      selectedDriver?.location ||
+      pickupLocation ||
+      dropoffLocation ||
+      fallbackCenter;
 
     const markers = [
       ...(pickupLocation
@@ -938,7 +1144,11 @@ export default function BookRideScreen() {
         });
       }
 
-      if (selectedDriver?.location && dropoffLocation && currentRide?.status === "in_progress") {
+      if (
+        selectedDriver?.location &&
+        dropoffLocation &&
+        currentRide?.status === "in_progress"
+      ) {
         fallbackSegments.push({
           id: "driver-to-dropoff-fallback",
           path: [
@@ -976,7 +1186,9 @@ export default function BookRideScreen() {
         {/* Ride Info Panel */}
         <View className="bg-white p-6 border-t border-gray-200">
           <View className="items-center mb-4">
-            <Text className="text-black text-lg font-semibold">{rideStatus}</Text>
+            <Text className="text-black text-lg font-semibold">
+              {rideStatus}
+            </Text>
             {selectedDriver && (
               <Text className="text-gray-600">
                 {selectedDriver.name} • {selectedDriver.vehicleNumber}
@@ -994,7 +1206,7 @@ export default function BookRideScreen() {
                       selectedDriver.location,
                       currentRide?.status === "in_progress" && dropoffLocation
                         ? dropoffLocation
-                        : pickupLocation
+                        : pickupLocation,
                     )} mins`
                   : `${selectedDriver?.estimatedArrival || 0} mins`}
               </Text>
@@ -1012,11 +1224,27 @@ export default function BookRideScreen() {
             </TouchableOpacity>
           </View>
 
+          {/* Share Trip Button */}
+          {(currentRide?.status === "accepted" ||
+            currentRide?.status === "in_progress") && (
+            <TouchableOpacity
+              onPress={() => setShowShareModal(true)}
+              className="bg-blue-50 border border-blue-200 rounded-xl py-3 mb-3 flex-row items-center justify-center"
+            >
+              <Ionicons name="share-social" size={20} color="#2563eb" />
+              <Text className="text-center text-blue-600 font-medium ml-2">
+                Share Trip
+              </Text>
+            </TouchableOpacity>
+          )}
+
           <TouchableOpacity
             onPress={cancelRide}
             className="bg-red-50 border border-red-200 rounded-xl py-3"
           >
-            <Text className="text-center text-red-600 font-medium">Cancel Ride</Text>
+            <Text className="text-center text-red-600 font-medium">
+              Cancel Ride
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -1041,6 +1269,26 @@ export default function BookRideScreen() {
       {currentStep === "awaiting-driver" && renderAwaitingDriverStep()}
       {currentStep === "ride-tracking" && renderRideTrackingStep()}
 
+      {/* Share Trip Modal */}
+      {currentRide && (
+        <ShareTripModal
+          visible={showShareModal}
+          onClose={() => setShowShareModal(false)}
+          rideId={currentRide.id}
+          rideDetails={{
+            pickup:
+              pickupLocation?.address ||
+              currentRide.pickup ||
+              "Pickup location",
+            dropoff:
+              dropoffLocation?.address ||
+              currentRide.dropoff ||
+              "Dropoff location",
+            status: currentRide.status,
+          }}
+        />
+      )}
+
       {/* Location Picker Modal */}
       <Modal
         visible={showLocationPicker}
@@ -1062,9 +1310,13 @@ export default function BookRideScreen() {
       >
         <LocationPicker
           title={
-            locationPickerType === "pickup" ? "Select Pickup Location" : "Select Dropoff Location"
+            locationPickerType === "pickup"
+              ? "Select Pickup Location"
+              : "Select Dropoff Location"
           }
-          placeholder={locationPickerType === "pickup" ? "Where are you?" : "Where to?"}
+          placeholder={
+            locationPickerType === "pickup" ? "Where are you?" : "Where to?"
+          }
           onLocationSelect={handleLocationConfirm}
           onCancel={() => setShowLocationPicker(false)}
           initialLocation={
@@ -1074,6 +1326,31 @@ export default function BookRideScreen() {
           }
         />
       </Modal>
+
+      {/* Alert Modal */}
+      <AlertModal
+        visible={alertConfig.visible}
+        type={alertConfig.type}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        onClose={() => setAlertConfig({ ...alertConfig, visible: false })}
+      />
+
+      {/* Confirmation Modal */}
+      <ConfirmModal
+        visible={confirmConfig.visible}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        confirmText="Yes"
+        cancelText="No"
+        onConfirm={() => {
+          setConfirmConfig({ ...confirmConfig, visible: false });
+          confirmConfig.onConfirm();
+        }}
+        onCancel={() => setConfirmConfig({ ...confirmConfig, visible: false })}
+        destructive={true}
+        icon="warning"
+      />
     </SafeAreaView>
   );
 }

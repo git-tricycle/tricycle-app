@@ -1,14 +1,18 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+  useCallback,
+} from "react";
 import {
   View,
   Text,
   FlatList,
   TouchableOpacity,
-  Alert,
   RefreshControl,
   ActivityIndicator,
   Modal,
-  Image,
   Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -17,9 +21,15 @@ import { router } from "expo-router";
 import { useAuth } from "@/src/contexts/AuthContext";
 import { rideService, type Ride } from "@/src/services/ride.service";
 import { driverService } from "@/src/services/driver.service";
-import MapView, { type Location, type MapPolyline } from "@/src/components/ui/MapView";
+import socketService from "@/src/services/socket.service";
+import MapView, {
+  type Location,
+  type MapPolyline,
+} from "@/src/components/ui/MapView";
 import * as ExpoLocation from "expo-location";
 import { getRouteBetween } from "@/src/services/directions.service";
+import { AlertModal, type AlertType } from "@/src/components/AlertModal";
+import { ConfirmModal } from "@/src/components/ConfirmModal";
 
 interface RideRequest extends Ride {
   estimatedTime?: number;
@@ -35,80 +45,164 @@ export default function RideRequestsScreen() {
   const [activeRide, setActiveRide] = useState<Ride | null>(null);
   const [isActiveRideVisible, setIsActiveRideVisible] = useState(false);
 
-  const showAlert = (title: string, message: string) => {
-    if (Platform.OS === "web") {
-      alert(`${title}: ${message}`);
-    } else {
-      Alert.alert(title, message);
-    }
+  // Alert modal state
+  const [alertConfig, setAlertConfig] = useState<{
+    visible: boolean;
+    type: AlertType;
+    title: string;
+    message: string;
+    onClose: () => void;
+  }>({
+    visible: false,
+    type: "info",
+    title: "",
+    message: "",
+    onClose: () => {},
+  });
+
+  // Confirmation modal state for accept ride
+  const [confirmConfig, setConfirmConfig] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    onCancel: () => void;
+  }>({
+    visible: false,
+    title: "",
+    message: "",
+    onConfirm: () => {},
+    onCancel: () => {},
+  });
+
+  const showAlert = (
+    title: string,
+    message: string,
+    type: AlertType = "info",
+  ) => {
+    setAlertConfig({
+      visible: true,
+      type,
+      title,
+      message,
+      onClose: () => setAlertConfig((prev) => ({ ...prev, visible: false })),
+    });
+  };
+
+  const showConfirm = (
+    title: string,
+    message: string,
+    onConfirm: () => void,
+    onCancel?: () => void,
+  ) => {
+    setConfirmConfig({
+      visible: true,
+      title,
+      message,
+      onConfirm: () => {
+        setConfirmConfig((prev) => ({ ...prev, visible: false }));
+        onConfirm();
+      },
+      onCancel: () => {
+        setConfirmConfig((prev) => ({ ...prev, visible: false }));
+        onCancel?.();
+      },
+    });
   };
   const [driverLocation, setDriverLocation] = useState<Location | null>(null);
+  const driverLocationRef = useRef<Location | null>(null);
   const [isRideStatusUpdating, setIsRideStatusUpdating] = useState(false);
-  const locationWatcher = useRef<ExpoLocation.LocationSubscription | null>(null);
-  const motorbikeIcon = useMemo(() => {
-    if (Platform.OS === "web") {
-      return require("@/assets/images/motorbike.png");
-    }
-    return Image.resolveAssetSource(require("@/assets/images/motorbike.png")).uri;
-  }, []);
+  const locationWatcher = useRef<ExpoLocation.LocationSubscription | null>(
+    null,
+  );
+
   const [routePolylines, setRoutePolylines] = useState<MapPolyline[]>([]);
   const lastRouteKeyRef = useRef<string | null>(null);
-  const [newRideNotification, setNewRideNotification] = useState<RideRequest | null>(null);
+  const [newRideNotification, setNewRideNotification] =
+    useState<RideRequest | null>(null);
   const [isNotificationVisible, setIsNotificationVisible] = useState(false);
   const previousRideCountRef = useRef<number>(0);
 
   useEffect(() => {
-    loadRideRequests();
+    // Initialize Socket.IO connection
+    const initializeSocket = async () => {
+      try {
+        if (!socketService.isConnected()) {
+          await socketService.connect();
+        }
 
-    // Set up auto-refresh: aggressive polling for real-time notifications
-    // Check for new ride requests every 5 seconds for immediate notifications
-    const interval = setInterval(() => {
+        // Join driver room for real-time notifications
+        if (user?.id) {
+          socketService.joinDriverRoom(user.id);
+        }
+      } catch (error) {
+        console.error("Failed to initialize socket connection:", error);
+      }
+    };
+
+    initializeSocket();
+    loadRideRequests();
+    getCurrentLocation(); // Get current GPS location on mount
+
+    // Socket.IO real-time updates
+    const handleNewRideRequest = (data: any) => {
+      console.log("New ride request received:", data);
+
+      // Show notification
+      if (data.ride) {
+        setNewRideNotification(data.ride);
+        setIsNotificationVisible(true);
+
+        // Auto-hide notification after 10 seconds
+        setTimeout(() => {
+          setIsNotificationVisible(false);
+        }, 10000);
+      }
+
+      // Refresh ride list
+      loadRideRequests(false);
+    };
+
+    const handleRideStatusUpdate = (data: any) => {
+      if (activeRide && data.rideId === activeRide.id) {
+        // Update active ride status in real-time
+        if (data.status === "cancelled") {
+          setActiveRide(null);
+          setIsActiveRideVisible(false);
+          showAlert(
+            "Ride Cancelled",
+            "The passenger has cancelled this ride request.",
+            "warning",
+          );
+          loadRideRequests(false);
+        } else {
+          setActiveRide((prev) =>
+            prev ? { ...prev, status: data.status } : null,
+          );
+        }
+      } else {
+        // Status update for a ride in the list
+        loadRideRequests(false);
+      }
+    };
+
+    // Subscribe to socket events
+    socketService.on("ride:new", handleNewRideRequest);
+    socketService.on("ride:status:update", handleRideStatusUpdate);
+
+    // Minimal fallback polling only every 60 seconds
+    const fallbackInterval = setInterval(() => {
       if (!isActiveRideVisible) {
         loadRideRequests(false);
       }
-    }, 5000);
-
-    // Separate aggressive polling for active ride cancellation detection
-    let activeRideInterval: ReturnType<typeof setInterval> | null = null;
-    if (isActiveRideVisible && activeRide?.id) {
-      activeRideInterval = setInterval(async () => {
-        try {
-          const response = await rideService.getRideById(activeRide.id);
-          if (response.success && response.data) {
-            // Check if ride was cancelled by passenger
-            if (response.data.status === "cancelled" && activeRide.status !== "cancelled") {
-              setActiveRide(response.data);
-              setIsActiveRideVisible(false);
-              if (Platform.OS === "web") {
-                alert("Ride Cancelled: The passenger has cancelled this ride request.");
-                setActiveRide(null);
-                loadRideRequests(false); // Refresh the list
-              } else {
-                Alert.alert("Ride Cancelled", "The passenger has cancelled this ride request.", [
-                  {
-                    text: "OK",
-                    onPress: () => {
-                      setActiveRide(null);
-                      loadRideRequests(false); // Refresh the list
-                    },
-                  },
-                ]);
-              }
-            }
-          }
-        } catch (error) {
-          console.error("Error checking ride cancellation:", error);
-        }
-      }, 5000); // Check every 5 seconds for cancellations
-    }
+    }, 60000);
 
     return () => {
-      clearInterval(interval);
-      if (activeRideInterval) {
-        clearInterval(activeRideInterval);
-      }
+      socketService.off("ride:new", handleNewRideRequest);
+      socketService.off("ride:status:update", handleRideStatusUpdate);
+      clearInterval(fallbackInterval);
     };
-  }, [isActiveRideVisible, activeRide?.id, activeRide?.status]);
+  }, [isActiveRideVisible, activeRide?.id, activeRide?.status, user?.id]);
 
   const loadRideRequests = async (showLoading = true) => {
     try {
@@ -127,21 +221,28 @@ export default function RideRequestsScreen() {
       });
 
       // Double check: filter out any cancelled rides just in case
-      const filteredRides = response.data?.filter((ride) => ride.status === "pending") || [];
+      const filteredRides =
+        response.data?.filter((ride) => ride.status === "pending") || [];
 
       if (response.success && filteredRides.length > 0) {
         // Calculate estimated time and distance for each ride based on coordinates
         const requestsWithEstimates = filteredRides.map((ride) => {
           // Calculate distance using Haversine formula
           const distance = calculateDistance(
-            { latitude: ride.location?.latitude || 0, longitude: ride.location?.longitude || 0 },
-            { latitude: 13.92077, longitude: 122.09891 } // Assuming current driver location (can be updated)
+            {
+              latitude: ride.location?.latitude || 0,
+              longitude: ride.location?.longitude || 0,
+            },
+            driverLocation || { latitude: 13.92077, longitude: 122.09891 }, // Use current GPS location or default
           );
 
           // Calculate ETA: Average tricycle speed in Gumaca is ~25-30 km/h
           // Adding 2 minutes base time for traffic/stops
           const avgSpeed = 28; // km/h
-          const estimatedTime = Math.max(3, Math.ceil((distance / avgSpeed) * 60 + 2)); // min
+          const estimatedTime = Math.max(
+            3,
+            Math.ceil((distance / avgSpeed) * 60 + 2),
+          ); // min
 
           return {
             ...ride,
@@ -168,7 +269,11 @@ export default function RideRequestsScreen() {
       }
     } catch (error) {
       console.error("Error loading ride requests:", error);
-      showAlert("Error", "Failed to load ride requests. Please try again.");
+      showAlert(
+        "Error",
+        "Failed to load ride requests. Please try again.",
+        "error",
+      );
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -177,7 +282,7 @@ export default function RideRequestsScreen() {
 
   const handleAcceptRide = async (rideId: string) => {
     if (!user?.id) {
-      showAlert("Error", "User not authenticated");
+      showAlert("Error", "User not authenticated", "error");
       return;
     }
 
@@ -191,39 +296,120 @@ export default function RideRequestsScreen() {
           // Remove accepted ride from list
           setRideRequests((prev) => prev.filter((ride) => ride.id !== rideId));
           setActiveRide(response.data);
-          await loadDriverLocation();
+          await getCurrentLocation(); // Get current GPS location
           setIsActiveRideVisible(true);
 
-          // Web platform notification
-          if (Platform.OS === "web") {
-            console.log(
-              "Ride accepted successfully on web platform. Note: Real-time location tracking is not available on web."
-            );
-          }
+          showAlert("Success", "Ride accepted successfully!", "success");
         } else {
-          showAlert("Error", response.message || "Failed to accept ride");
+          showAlert(
+            "Error",
+            response.message || "Failed to accept ride",
+            "error",
+          );
         }
       } catch (error) {
         console.error("Error accepting ride:", error);
-        showAlert("Error", "Failed to accept ride. Please try again.");
+        showAlert("Error", "Failed to accept ride. Please try again.", "error");
       } finally {
         setProcessingRideId(null);
       }
     };
 
-    if (Platform.OS === "web") {
-      const confirmed = confirm("Are you sure you want to accept this ride request?");
-      if (confirmed) {
-        performAccept();
+    showConfirm(
+      "Accept Ride",
+      "Are you sure you want to accept this ride request?",
+      performAccept,
+    );
+  };
+
+  const getCurrentLocation = async () => {
+    try {
+      // Web platform - use browser geolocation API
+      if (Platform.OS === "web") {
+        if (!navigator.geolocation) {
+          showAlert(
+            "Geolocation Not Supported",
+            "Your browser does not support location services.",
+            "error",
+          );
+          return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            const coords = {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+            };
+
+            setDriverLocation(coords);
+            driverLocationRef.current = coords;
+            await updateRoutePolylines(coords);
+
+            // Update location in backend
+            try {
+              await driverService.updateDriverLocation(coords);
+            } catch (error) {
+              console.error("Failed to update location in backend:", error);
+            }
+          },
+          (error) => {
+            console.error("Web geolocation error:", error);
+            showAlert(
+              "Location Error",
+              error.code === error.PERMISSION_DENIED
+                ? "Please enable location access in your browser settings."
+                : "Failed to get your current location. Please check your GPS settings.",
+              "error",
+            );
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 5000,
+          },
+        );
+      } else {
+        // Native platform - use Expo Location
+        const { status } =
+          await ExpoLocation.requestForegroundPermissionsAsync();
+        if (status !== "granted") {
+          showAlert(
+            "Location Permission Required",
+            "Please enable location access to use this feature.",
+            "warning",
+          );
+          return;
+        }
+
+        // Get current position with high accuracy
+        const location = await ExpoLocation.getCurrentPositionAsync({
+          accuracy: ExpoLocation.Accuracy.High,
+        });
+
+        const coords = {
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+        };
+
+        setDriverLocation(coords);
+        driverLocationRef.current = coords;
+        await updateRoutePolylines(coords);
+
+        // Update location in backend
+        try {
+          await driverService.updateDriverLocation(coords);
+        } catch (error) {
+          console.error("Failed to update location in backend:", error);
+        }
       }
-    } else {
-      Alert.alert("Accept Ride", "Are you sure you want to accept this ride request?", [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Accept",
-          onPress: performAccept,
-        },
-      ]);
+    } catch (error) {
+      console.error("Failed to get current location:", error);
+      showAlert(
+        "Location Error",
+        "Failed to get your current location. Please check your GPS settings.",
+        "error",
+      );
     }
   };
 
@@ -233,7 +419,7 @@ export default function RideRequestsScreen() {
     try {
       const profileResponse = await driverService.getDriverById(
         user.id,
-        "user.location.latitude,user.location.longitude"
+        "user.location.latitude,user.location.longitude",
       );
 
       if (profileResponse.success) {
@@ -303,9 +489,16 @@ export default function RideRequestsScreen() {
 
   const updateRoutePolylines = useCallback(
     async (currentLocation?: Location) => {
-      const driverLoc = currentLocation || driverLocation;
+      console.log("=== updateRoutePolylines called ===");
+      const driverLoc = currentLocation || driverLocationRef.current;
+
+      console.log("Driver location:", driverLoc);
+      console.log("Pickup coordinate:", pickupCoordinate);
+      console.log("Dropoff coordinate:", dropoffCoordinate);
+      console.log("Active ride status:", activeRide?.status);
 
       if (!driverLoc) {
+        console.log("No driver location, clearing routes");
         setRoutePolylines([]);
         lastRouteKeyRef.current = null;
         return;
@@ -320,6 +513,7 @@ export default function RideRequestsScreen() {
       }> = [];
 
       if (pickupCoordinate) {
+        console.log("Adding driver-to-pickup segment");
         segments.push({
           id: "driver-to-pickup",
           from: driverLoc,
@@ -330,6 +524,7 @@ export default function RideRequestsScreen() {
       }
 
       if (activeRide?.status === "in_progress" && dropoffCoordinate) {
+        console.log("Adding driver-to-dropoff segment");
         segments.push({
           id: "driver-to-dropoff",
           from: driverLoc,
@@ -339,29 +534,58 @@ export default function RideRequestsScreen() {
         });
       }
 
+      console.log("Total segments:", segments.length);
+
       if (segments.length === 0) {
+        console.log("No segments, clearing routes");
         setRoutePolylines([]);
         lastRouteKeyRef.current = null;
         return;
       }
 
+      // Set fallback straight-line routes immediately
+      const fallbackRoutes: MapPolyline[] = segments.map((segment) => ({
+        id: `${segment.id}-fallback`,
+        path: [segment.from, segment.to],
+        color: segment.color,
+        weight: segment.weight,
+      }));
+      console.log("Setting fallback routes:", fallbackRoutes);
+      setRoutePolylines(fallbackRoutes);
+
       const rounded = (value: number) => value.toFixed(5);
       const routeKey = segments
         .map(
           (segment) =>
-            `${segment.id}:${rounded(segment.from.latitude)},${rounded(segment.from.longitude)}->${rounded(segment.to.latitude)},${rounded(segment.to.longitude)}`
+            `${segment.id}:${rounded(segment.from.latitude)},${rounded(segment.from.longitude)}->${rounded(segment.to.latitude)},${rounded(segment.to.longitude)}`,
         )
         .join("|");
 
+      console.log("Route key:", routeKey);
+      console.log("Last route key:", lastRouteKeyRef.current);
+
       if (routeKey === lastRouteKeyRef.current) {
+        console.log("Route key unchanged, skipping detailed route fetch");
         return;
       }
 
+      console.log("Fetching detailed routes from API...");
       const routes = await Promise.all(
         segments.map(async (segment) => {
+          console.log(`Fetching route for ${segment.id}`);
           const path = await getRouteBetween(segment.from, segment.to);
+          console.log(`Route path length for ${segment.id}:`, path.length);
           if (path.length < 2) {
-            return null;
+            console.log(
+              `Route path too short for ${segment.id}, using fallback`,
+            );
+            // Return fallback straight line if API fails
+            return {
+              id: segment.id,
+              path: [segment.from, segment.to],
+              color: segment.color,
+              weight: segment.weight,
+            } as MapPolyline;
           }
           return {
             id: segment.id,
@@ -369,14 +593,19 @@ export default function RideRequestsScreen() {
             color: segment.color,
             weight: segment.weight,
           } as MapPolyline;
-        })
+        }),
       );
 
-      const validRoutes = routes.filter((route): route is MapPolyline => Boolean(route));
+      const validRoutes = routes.filter((route): route is MapPolyline =>
+        Boolean(route),
+      );
+      console.log("Valid detailed routes count:", validRoutes.length);
+      console.log("Setting detailed route polylines:", validRoutes);
       setRoutePolylines(validRoutes);
       lastRouteKeyRef.current = routeKey;
+      console.log("=== updateRoutePolylines complete ===");
     },
-    [driverLocation, pickupCoordinate, dropoffCoordinate, activeRide?.status]
+    [pickupCoordinate, dropoffCoordinate, activeRide?.status],
   );
 
   useEffect(() => {
@@ -385,53 +614,129 @@ export default function RideRequestsScreen() {
       activeRide &&
       (activeRide.status === "accepted" || activeRide.status === "in_progress");
 
-    if (!shouldTrackLocation || Platform.OS === "web") {
+    if (!shouldTrackLocation) {
       stopLocationWatcher();
       return;
     }
 
     let isMounted = true;
+    let lastSentLocation: Location | null = null;
+
+    // Helper to calculate distance between two points in meters
+    const calculateDistance = (loc1: Location, loc2: Location): number => {
+      const R = 6371e3; // Earth radius in meters
+      const φ1 = (loc1.latitude * Math.PI) / 180;
+      const φ2 = (loc2.latitude * Math.PI) / 180;
+      const Δφ = ((loc2.latitude - loc1.latitude) * Math.PI) / 180;
+      const Δλ = ((loc2.longitude - loc1.longitude) * Math.PI) / 180;
+
+      const a =
+        Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+        Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+      return R * c;
+    };
+
+    const handleLocationUpdate = (coords: Location) => {
+      if (!isMounted) return;
+
+      // Update local state immediately for smooth UI
+      setDriverLocation(coords);
+      driverLocationRef.current = coords;
+
+      // Only send updates if driver has moved significantly (> 20 meters)
+      const shouldSendUpdate =
+        !lastSentLocation || calculateDistance(lastSentLocation, coords) > 20;
+
+      if (shouldSendUpdate) {
+        lastSentLocation = coords;
+
+        // Update route polylines
+        updateRoutePolylines(coords);
+
+        // Send location update via API (backend will broadcast via socket)
+        driverService
+          .updateDriverLocation({
+            latitude: coords.latitude,
+            longitude: coords.longitude,
+          })
+          .catch((error) =>
+            console.error("Failed to sync driver location:", error),
+          );
+      }
+    };
 
     const startTracking = async () => {
       try {
-        const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
-        if (status !== "granted") {
-          showAlert(
-            "Location Permission Required",
-            "Please enable location access so passengers can track you in real time."
-          );
-          return;
-        }
-
-        const subscription = await ExpoLocation.watchPositionAsync(
-          {
-            accuracy: ExpoLocation.Accuracy.Highest,
-            distanceInterval: 10,
-            timeInterval: 5000,
-          },
-          (position) => {
-            if (!isMounted) {
-              return;
-            }
-
-            const coords = {
-              latitude: position.coords.latitude,
-              longitude: position.coords.longitude,
-            };
-
-            setDriverLocation(coords);
-            updateRoutePolylines(coords);
-
-            driverService
-              .updateDriverLocation({
-                latitude: coords.latitude,
-                longitude: coords.longitude,
-              })
-              .catch((error) => console.error("Failed to sync driver location:", error));
+        // Web platform - use browser geolocation API
+        if (Platform.OS === "web") {
+          if (!navigator.geolocation) {
+            showAlert(
+              "Geolocation Not Supported",
+              "Your browser does not support location tracking.",
+              "error",
+            );
+            return;
           }
-        );
 
-        locationWatcher.current = subscription;
+          const watchId = navigator.geolocation.watchPosition(
+            (position) => {
+              handleLocationUpdate({
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+              });
+            },
+            (error) => {
+              console.error("Web geolocation error:", error);
+              if (error.code === error.PERMISSION_DENIED) {
+                showAlert(
+                  "Location Permission Denied",
+                  "Please enable location access in your browser settings.",
+                  "warning",
+                );
+              }
+            },
+            {
+              enableHighAccuracy: true,
+              maximumAge: 3000,
+              timeout: 10000,
+            },
+          );
+
+          // Store the watch ID in a format compatible with stopLocationWatcher
+          locationWatcher.current = {
+            remove: () => navigator.geolocation.clearWatch(watchId),
+          } as any;
+        } else {
+          // Native platform - use Expo Location
+          const { status } =
+            await ExpoLocation.requestForegroundPermissionsAsync();
+          if (status !== "granted") {
+            showAlert(
+              "Location Permission Required",
+              "Please enable location access so passengers can track you in real time.",
+              "warning",
+            );
+            return;
+          }
+
+          const subscription = await ExpoLocation.watchPositionAsync(
+            {
+              accuracy: ExpoLocation.Accuracy.High,
+              distanceInterval: 20, // Only update when moved 20+ meters
+              timeInterval: 10000, // Or every 10 seconds max
+            },
+            (position) => {
+              handleLocationUpdate({
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+              });
+            },
+          );
+
+          locationWatcher.current = subscription;
+        }
       } catch (error) {
         console.error("Failed to start location tracking:", error);
       }
@@ -443,7 +748,7 @@ export default function RideRequestsScreen() {
       isMounted = false;
       stopLocationWatcher();
     };
-  }, [isActiveRideVisible, activeRide?.status, updateRoutePolylines]);
+  }, [isActiveRideVisible, activeRide?.status]);
 
   useEffect(() => {
     return () => {
@@ -451,12 +756,17 @@ export default function RideRequestsScreen() {
     };
   }, []);
 
+  // Update route polylines when active ride modal opens
   useEffect(() => {
-    updateRoutePolylines();
-  }, [pickupCoordinate, dropoffCoordinate, activeRide?.status, updateRoutePolylines]);
+    if (isActiveRideVisible && activeRide && driverLocationRef.current) {
+      console.log("Active ride modal opened, updating routes...");
+      updateRoutePolylines(driverLocationRef.current);
+    }
+  }, [isActiveRideVisible, activeRide?.id, updateRoutePolylines]);
+
   const updateActiveRideStatus = async (
     action: "start" | "complete" | "cancel",
-    successMessage: string
+    successMessage: string,
   ) => {
     if (!activeRide?.id) return;
 
@@ -474,17 +784,25 @@ export default function RideRequestsScreen() {
 
       if (response?.success && response.data) {
         setActiveRide(response.data);
-        showAlert("Success", successMessage);
+        showAlert("Success", successMessage, "success");
         if (action === "complete" || action === "cancel") {
           setIsActiveRideVisible(false);
           setActiveRide(null);
         }
       } else if (response) {
-        showAlert("Error", response.message || "Unable to update ride status");
+        showAlert(
+          "Error",
+          response.message || "Unable to update ride status",
+          "error",
+        );
       }
     } catch (error) {
       console.error("Failed to update ride status:", error);
-      showAlert("Error", "Unable to update ride status. Please try again.");
+      showAlert(
+        "Error",
+        "Unable to update ride status. Please try again.",
+        "error",
+      );
     } finally {
       setIsRideStatusUpdating(false);
     }
@@ -513,9 +831,8 @@ export default function RideRequestsScreen() {
             {
               id: "driver",
               location: driverLocation,
-              title: "Your Location",
+              title: "Your Location (Driver)",
               color: "#3b82f6",
-              icon: motorbikeIcon,
             },
           ]
         : []),
@@ -532,16 +849,14 @@ export default function RideRequestsScreen() {
 
     let polylinesToRender = routePolylines;
 
-    if (polylinesToRender.length === 0 && driverLocation && pickupMarker) {
-      polylinesToRender = [
-        {
-          id: "driver-to-pickup-fallback",
-          path: [driverLocation, pickupMarker.location],
-          color: "#22c55e",
-          weight: 4,
-        },
-      ];
-    }
+    // Debug logging
+    console.log("=== Driver Map Rendering ===");
+    console.log("Driver Location:", driverLocation);
+    console.log("Pickup Marker:", pickupMarker);
+    console.log("Route Polylines from state:", routePolylines);
+    console.log("Polylines to render:", polylinesToRender);
+    console.log("Active Ride Status:", activeRide?.status);
+    console.log("========================");
 
     return (
       <Modal
@@ -570,8 +885,12 @@ export default function RideRequestsScreen() {
             <TouchableOpacity onPress={() => setIsActiveRideVisible(false)}>
               <Ionicons name="arrow-back" size={24} color="white" />
             </TouchableOpacity>
-            <Text className="text-white text-lg font-semibold">Active Ride</Text>
-            <View style={{ width: 24 }} />
+            <Text className="text-white text-lg font-semibold">
+              Active Ride
+            </Text>
+            <TouchableOpacity onPress={getCurrentLocation}>
+              <Ionicons name="locate" size={24} color="white" />
+            </TouchableOpacity>
           </View>
 
           <View className="flex-1">
@@ -597,23 +916,35 @@ export default function RideRequestsScreen() {
                 {`${activeRide.passenger?.firstName ?? ""} ${activeRide.passenger?.lastName ?? ""}`.trim() ||
                   "N/A"}
               </Text>
+              {driverLocation && (
+                <Text className="text-gray-500 text-xs mt-1">
+                  📍 Your Location: {driverLocation.latitude.toFixed(5)},{" "}
+                  {driverLocation.longitude.toFixed(5)}
+                </Text>
+              )}
             </View>
 
             <View className="bg-gray-50 rounded-xl p-4 mb-4">
               <View className="flex-row items-center mb-3">
                 <Ionicons name="radio-button-on" size={16} color="#22c55e" />
-                <Text className="text-black ml-2 flex-1">{activeRide.pickup}</Text>
+                <Text className="text-black ml-2 flex-1">
+                  {activeRide.pickup}
+                </Text>
               </View>
               <View className="flex-row items-center">
                 <Ionicons name="location" size={16} color="#ef4444" />
-                <Text className="text-black ml-2 flex-1">{activeRide.dropoff}</Text>
+                <Text className="text-black ml-2 flex-1">
+                  {activeRide.dropoff}
+                </Text>
               </View>
             </View>
 
             <View className="flex-row justify-between items-center mb-4">
               <View>
                 <Text className="text-gray-600 text-sm">Fare</Text>
-                <Text className="text-black text-lg font-semibold">₱{activeRide.fare}</Text>
+                <Text className="text-black text-lg font-semibold">
+                  ₱{activeRide.fare}
+                </Text>
               </View>
               <View>
                 <Text className="text-gray-600 text-sm">Payment</Text>
@@ -627,9 +958,10 @@ export default function RideRequestsScreen() {
                   {driverLocation && activeRide.location
                     ? `${calculateETA(
                         driverLocation,
-                        activeRide.status === "in_progress" && (activeRide as any).dropoffLocation
+                        activeRide.status === "in_progress" &&
+                          (activeRide as any).dropoffLocation
                           ? (activeRide as any).dropoffLocation
-                          : activeRide.location
+                          : activeRide.location,
                       )} mins`
                     : activeRide.eta
                       ? `${activeRide.eta} mins`
@@ -641,7 +973,12 @@ export default function RideRequestsScreen() {
             <View className="flex-row gap-3">
               {activeRide.status === "accepted" && (
                 <TouchableOpacity
-                  onPress={() => updateActiveRideStatus("start", "Ride started successfully!")}
+                  onPress={() =>
+                    updateActiveRideStatus(
+                      "start",
+                      "Ride started successfully!",
+                    )
+                  }
                   className="flex-1 bg-black rounded-xl py-3"
                   disabled={isRideStatusUpdating}
                 >
@@ -651,7 +988,9 @@ export default function RideRequestsScreen() {
                     ) : (
                       <Ionicons name="play" size={18} color="#fff" />
                     )}
-                    <Text className="text-white font-semibold ml-2">Start Ride</Text>
+                    <Text className="text-white font-semibold ml-2">
+                      Start Ride
+                    </Text>
                   </View>
                 </TouchableOpacity>
               )}
@@ -659,7 +998,10 @@ export default function RideRequestsScreen() {
               {activeRide.status === "in_progress" && (
                 <TouchableOpacity
                   onPress={() =>
-                    updateActiveRideStatus("complete", "Ride marked as completed. Great job!")
+                    updateActiveRideStatus(
+                      "complete",
+                      "Ride marked as completed. Great job!",
+                    )
                   }
                   className="flex-1 bg-green-600 rounded-xl py-3"
                   disabled={isRideStatusUpdating}
@@ -670,27 +1012,37 @@ export default function RideRequestsScreen() {
                     ) : (
                       <Ionicons name="checkmark" size={18} color="#fff" />
                     )}
-                    <Text className="text-white font-semibold ml-2">Complete Ride</Text>
+                    <Text className="text-white font-semibold ml-2">
+                      Complete Ride
+                    </Text>
                   </View>
                 </TouchableOpacity>
               )}
 
-              {activeRide.status !== "completed" && activeRide.status !== "cancelled" && (
-                <TouchableOpacity
-                  onPress={() => updateActiveRideStatus("cancel", "Ride has been cancelled.")}
-                  className="flex-1 bg-red-50 border border-red-200 rounded-xl py-3"
-                  disabled={isRideStatusUpdating}
-                >
-                  <View className="flex-row items-center justify-center">
-                    {isRideStatusUpdating ? (
-                      <ActivityIndicator size="small" color="#ef4444" />
-                    ) : (
-                      <Ionicons name="close" size={18} color="#ef4444" />
-                    )}
-                    <Text className="text-red-600 font-semibold ml-2">Cancel Ride</Text>
-                  </View>
-                </TouchableOpacity>
-              )}
+              {activeRide.status !== "completed" &&
+                activeRide.status !== "cancelled" && (
+                  <TouchableOpacity
+                    onPress={() =>
+                      updateActiveRideStatus(
+                        "cancel",
+                        "Ride has been cancelled.",
+                      )
+                    }
+                    className="flex-1 bg-red-50 border border-red-200 rounded-xl py-3"
+                    disabled={isRideStatusUpdating}
+                  >
+                    <View className="flex-row items-center justify-center">
+                      {isRideStatusUpdating ? (
+                        <ActivityIndicator size="small" color="#ef4444" />
+                      ) : (
+                        <Ionicons name="close" size={18} color="#ef4444" />
+                      )}
+                      <Text className="text-red-600 font-semibold ml-2">
+                        Cancel Ride
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                )}
             </View>
           </View>
         </SafeAreaView>
@@ -698,7 +1050,10 @@ export default function RideRequestsScreen() {
     );
   };
 
-  const calculateDistance = (location1: Location, location2: Location): number => {
+  const calculateDistance = (
+    location1: Location,
+    location2: Location,
+  ): number => {
     // Haversine formula for accurate distance calculation
     const R = 6371; // Earth's radius in km
     const dLat = ((location2.latitude - location1.latitude) * Math.PI) / 180;
@@ -713,7 +1068,10 @@ export default function RideRequestsScreen() {
     return R * c;
   };
 
-  const calculateETA = (currentLocation: Location, destinationLocation: Location): number => {
+  const calculateETA = (
+    currentLocation: Location,
+    destinationLocation: Location,
+  ): number => {
     // Calculate distance between current and destination
     const distance = calculateDistance(currentLocation, destinationLocation);
     // Average tricycle speed: 28 km/h
@@ -726,7 +1084,9 @@ export default function RideRequestsScreen() {
   const formatTimeAgo = (dateString: string): string => {
     const date = new Date(dateString);
     const now = new Date();
-    const diffMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
+    const diffMinutes = Math.floor(
+      (now.getTime() - date.getTime()) / (1000 * 60),
+    );
 
     if (diffMinutes < 1) return "Just now";
     if (diffMinutes < 60) return `${diffMinutes}m ago`;
@@ -772,8 +1132,12 @@ export default function RideRequestsScreen() {
                   <Ionicons name="sparkles" size={24} color="#22c55e" />
                 </View>
                 <View>
-                  <Text className="text-black text-lg font-bold">New Ride Request!</Text>
-                  <Text className="text-gray-500 text-sm">You have a ride opportunity</Text>
+                  <Text className="text-black text-lg font-bold">
+                    New Ride Request!
+                  </Text>
+                  <Text className="text-gray-500 text-sm">
+                    You have a ride opportunity
+                  </Text>
                 </View>
               </View>
               <TouchableOpacity onPress={() => setIsNotificationVisible(false)}>
@@ -807,7 +1171,10 @@ export default function RideRequestsScreen() {
                 <View className="w-6 h-6 bg-green-100 rounded-full items-center justify-center mr-3">
                   <Ionicons name="radio-button-on" size={12} color="#22c55e" />
                 </View>
-                <Text className="text-black flex-1 font-medium" numberOfLines={2}>
+                <Text
+                  className="text-black flex-1 font-medium"
+                  numberOfLines={2}
+                >
                   {newRideNotification.pickup}
                 </Text>
               </View>
@@ -818,7 +1185,10 @@ export default function RideRequestsScreen() {
                 <View className="w-6 h-6 bg-red-100 rounded-full items-center justify-center mr-3">
                   <Ionicons name="location" size={12} color="#ef4444" />
                 </View>
-                <Text className="text-black flex-1 font-medium" numberOfLines={2}>
+                <Text
+                  className="text-black flex-1 font-medium"
+                  numberOfLines={2}
+                >
                   {newRideNotification.dropoff}
                 </Text>
               </View>
@@ -834,7 +1204,9 @@ export default function RideRequestsScreen() {
               </View>
               <View className="items-center">
                 <Text className="text-gray-600 text-sm mb-1">Fare</Text>
-                <Text className="text-black font-bold text-lg">₱{newRideNotification.fare}</Text>
+                <Text className="text-black font-bold text-lg">
+                  ₱{newRideNotification.fare}
+                </Text>
               </View>
               <View className="items-center">
                 <Text className="text-gray-600 text-sm mb-1">ETA</Text>
@@ -850,7 +1222,9 @@ export default function RideRequestsScreen() {
                 onPress={() => setIsNotificationVisible(false)}
                 className="flex-1 bg-gray-200 rounded-xl py-3"
               >
-                <Text className="text-center text-gray-700 font-semibold">Decline</Text>
+                <Text className="text-center text-gray-700 font-semibold">
+                  Decline
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => {
@@ -861,7 +1235,9 @@ export default function RideRequestsScreen() {
               >
                 <View className="flex-row items-center justify-center">
                   <Ionicons name="checkmark-circle" size={18} color="white" />
-                  <Text className="text-center text-white font-semibold ml-2">Accept</Text>
+                  <Text className="text-center text-white font-semibold ml-2">
+                    Accept
+                  </Text>
                 </View>
               </TouchableOpacity>
             </View>
@@ -883,14 +1259,19 @@ export default function RideRequestsScreen() {
           </View>
           <View>
             <Text className="text-black font-semibold">
-              {item.passenger?.firstName || "Unknown"} {item.passenger?.lastName || "Passenger"}
+              {item.passenger?.firstName || "Unknown"}{" "}
+              {item.passenger?.lastName || "Passenger"}
             </Text>
-            <Text className="text-gray-500 text-sm">{formatTimeAgo(item.createdAt)}</Text>
+            <Text className="text-gray-500 text-sm">
+              {formatTimeAgo(item.createdAt)}
+            </Text>
           </View>
         </View>
         <View className="items-end">
           <Text className="text-black text-xl font-bold">₱{item.fare}</Text>
-          <Text className="text-gray-500 text-sm">{item.estimatedTime || 0} min away</Text>
+          <Text className="text-gray-500 text-sm">
+            {item.estimatedTime || 0} min away
+          </Text>
         </View>
       </View>
 
@@ -915,7 +1296,9 @@ export default function RideRequestsScreen() {
       <View className="flex-row justify-between items-center mb-4">
         <View className="flex-row items-center">
           <Ionicons name="car" size={16} color="#6b7280" />
-          <Text className="text-gray-600 text-sm ml-1">{item.distance || 0}km</Text>
+          <Text className="text-gray-600 text-sm ml-1">
+            {item.distance || 0}km
+          </Text>
         </View>
         <View className="flex-row items-center">
           <Ionicons name="wallet" size={16} color="#6b7280" />
@@ -925,7 +1308,9 @@ export default function RideRequestsScreen() {
         </View>
         <View className="flex-row items-center">
           <Ionicons name="time" size={16} color="#6b7280" />
-          <Text className="text-gray-600 text-sm ml-1">~{item.estimatedTime || 0} min</Text>
+          <Text className="text-gray-600 text-sm ml-1">
+            ~{item.estimatedTime || 0} min
+          </Text>
         </View>
       </View>
 
@@ -937,7 +1322,8 @@ export default function RideRequestsScreen() {
         style={
           Platform.OS === "web"
             ? ({
-                cursor: processingRideId === item.id ? "not-allowed" : "pointer",
+                cursor:
+                  processingRideId === item.id ? "not-allowed" : "pointer",
                 userSelect: "none",
                 outline: "none",
               } as any)
@@ -951,7 +1337,9 @@ export default function RideRequestsScreen() {
             <Text className="text-gray-600 font-medium ml-2">Accepting...</Text>
           </View>
         ) : (
-          <Text className="text-white text-center font-semibold">Accept Ride</Text>
+          <Text className="text-white text-center font-semibold">
+            Accept Ride
+          </Text>
         )}
       </TouchableOpacity>
     </View>
@@ -960,9 +1348,12 @@ export default function RideRequestsScreen() {
   const renderEmptyState = () => (
     <View className="flex-1 justify-center items-center px-6">
       <Ionicons name="notifications-off-outline" size={64} color="#d1d5db" />
-      <Text className="text-gray-500 text-lg font-medium mt-4 mb-2">No Ride Requests</Text>
+      <Text className="text-gray-500 text-lg font-medium mt-4 mb-2">
+        No Ride Requests
+      </Text>
       <Text className="text-gray-400 text-center">
-        There are no pending ride requests at the moment. Pull down to refresh or check back later.
+        There are no pending ride requests at the moment. Pull down to refresh
+        or check back later.
       </Text>
       <TouchableOpacity
         onPress={() => loadRideRequests()}
@@ -981,7 +1372,9 @@ export default function RideRequestsScreen() {
           <TouchableOpacity onPress={() => router.back()} className="mr-4">
             <Ionicons name="arrow-back" size={24} color="white" />
           </TouchableOpacity>
-          <Text className="text-white text-lg font-semibold">Ride Requests</Text>
+          <Text className="text-white text-lg font-semibold">
+            Ride Requests
+          </Text>
         </View>
 
         <View className="flex-1 justify-center items-center">
@@ -996,15 +1389,24 @@ export default function RideRequestsScreen() {
     <>
       <SafeAreaView className="flex-1 bg-gray-50">
         {/* Header */}
-        <View className="bg-black px-6 py-4 flex-row items-center justify-between">
+        <View className="bg-black px-4 py-3 flex-row items-center justify-between">
           <View className="flex-row items-center">
             <TouchableOpacity onPress={() => router.back()} className="mr-4">
               <Ionicons name="arrow-back" size={24} color="white" />
             </TouchableOpacity>
-            <Text className="text-white text-lg font-semibold">Ride Requests</Text>
+            <Text className="text-white text-lg font-semibold">
+              Ride Requests
+            </Text>
           </View>
-          <View className="bg-white/20 rounded-full px-3 py-1">
-            <Text className="text-white text-sm font-medium">{rideRequests.length} available</Text>
+          <View className="flex-row items-center gap-3">
+            <TouchableOpacity onPress={getCurrentLocation} className="p-1">
+              <Ionicons name="locate" size={22} color="white" />
+            </TouchableOpacity>
+            <View className="bg-white/20 rounded-full px-3 py-1">
+              <Text className="text-white text-sm font-medium">
+                {rideRequests.length} available
+              </Text>
+            </View>
           </View>
         </View>
 
@@ -1030,6 +1432,27 @@ export default function RideRequestsScreen() {
       </SafeAreaView>
       {renderNewRideNotificationModal()}
       {renderActiveRideModal()}
+
+      {/* Alert Modal */}
+      <AlertModal
+        visible={alertConfig.visible}
+        type={alertConfig.type}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        onClose={alertConfig.onClose}
+      />
+
+      {/* Confirmation Modal */}
+      <ConfirmModal
+        visible={confirmConfig.visible}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        confirmText="Accept"
+        cancelText="Cancel"
+        onConfirm={confirmConfig.onConfirm}
+        onCancel={confirmConfig.onCancel}
+        icon="help-circle"
+      />
     </>
   );
 }

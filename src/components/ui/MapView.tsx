@@ -1,4 +1,9 @@
-import React, { useRef, useImperativeHandle, forwardRef, useEffect } from "react";
+import React, {
+  useRef,
+  useImperativeHandle,
+  forwardRef,
+  useEffect,
+} from "react";
 import { View, Platform } from "react-native";
 import { WebView } from "react-native-webview";
 
@@ -35,7 +40,12 @@ export interface MapViewProps {
 
 export interface MapViewRef {
   setCenter: (location: Location) => void;
-  addMarker: (marker: { id: string; location: Location; title?: string; color?: string }) => void;
+  addMarker: (marker: {
+    id: string;
+    location: Location;
+    title?: string;
+    color?: string;
+  }) => void;
   removeMarker: (markerId: string) => void;
   getCurrentLocation: () => Promise<Location>;
 }
@@ -53,7 +63,7 @@ const MapView = forwardRef<MapViewRef, MapViewProps>(
       interactive = true,
       className = "",
     },
-    ref
+    ref,
   ) => {
     const webViewRef = useRef<WebView>(null);
 
@@ -63,7 +73,7 @@ const MapView = forwardRef<MapViewRef, MapViewProps>(
           JSON.stringify({
             type: "setCenter",
             payload: location,
-          })
+          }),
         );
       },
       addMarker: (marker) => {
@@ -71,7 +81,7 @@ const MapView = forwardRef<MapViewRef, MapViewProps>(
           JSON.stringify({
             type: "addMarker",
             payload: marker,
-          })
+          }),
         );
       },
       removeMarker: (markerId: string) => {
@@ -79,7 +89,7 @@ const MapView = forwardRef<MapViewRef, MapViewProps>(
           JSON.stringify({
             type: "removeMarker",
             payload: { id: markerId },
-          })
+          }),
         );
       },
       getCurrentLocation: async () => {
@@ -97,7 +107,7 @@ const MapView = forwardRef<MapViewRef, MapViewProps>(
           JSON.stringify({
             type: "setPolylines",
             payload: polylines,
-          })
+          }),
         );
       }
     }, [polylines]);
@@ -143,13 +153,13 @@ const MapView = forwardRef<MapViewRef, MapViewProps>(
 </head>
 <body>
     <div id="map"></div>
-    
+
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         let map;
         let markers = {};
         let userLocationMarker = null;
-        
+
         // Initialize map
         function initMap() {
             map = L.map('map', {
@@ -171,7 +181,7 @@ const MapView = forwardRef<MapViewRef, MapViewProps>(
                     latitude: e.latlng.lat,
                     longitude: e.latlng.lng
                 };
-                
+
                 window.ReactNativeWebView.postMessage(JSON.stringify({
                     type: 'locationSelected',
                     payload: location
@@ -191,7 +201,7 @@ const MapView = forwardRef<MapViewRef, MapViewProps>(
                         latitude: position.coords.latitude,
                         longitude: position.coords.longitude
                     };
-                    
+
                     // Add user location marker
                     userLocationMarker = L.circleMarker([userLocation.latitude, userLocation.longitude], {
                         color: '#2563eb',
@@ -199,7 +209,7 @@ const MapView = forwardRef<MapViewRef, MapViewProps>(
                         fillOpacity: 0.8,
                         radius: 8
                     }).addTo(map);
-                    
+
                     userLocationMarker.bindPopup('Your Location');
                 });
             }
@@ -229,22 +239,31 @@ const MapView = forwardRef<MapViewRef, MapViewProps>(
                     popupAnchor: [0, -24],
                     className: 'custom-marker-icon'
                 });
+            } else if (marker.color) {
+                // Use custom colored marker with divIcon
+                markerOptions.icon = L.divIcon({
+                    className: 'custom-colored-marker',
+                    html: '<div style="background-color: ' + marker.color + '; width: 24px; height: 24px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.3);"></div>',
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 12],
+                    popupAnchor: [0, -12]
+                });
             }
 
             const leafletMarker = L.marker([marker.location.latitude, marker.location.longitude], markerOptions)
                 .addTo(map);
-            
+
             if (marker.title) {
                 leafletMarker.bindPopup(marker.title);
             }
-            
+
             leafletMarker.on('click', function() {
                 window.ReactNativeWebView.postMessage(JSON.stringify({
                     type: 'markerPressed',
                     payload: { markerId: marker.id }
                 }));
             });
-            
+
             markers[marker.id] = leafletMarker;
         }
 
@@ -267,7 +286,7 @@ const MapView = forwardRef<MapViewRef, MapViewProps>(
         // Message handler from React Native
         window.addEventListener('message', function(event) {
             const message = JSON.parse(event.data);
-            
+
             switch (message.type) {
                 case 'setCenter':
                     map.setView([message.payload.latitude, message.payload.longitude], 15);
@@ -310,142 +329,82 @@ const MapView = forwardRef<MapViewRef, MapViewProps>(
     `;
     };
 
-    // Web implementation using Leaflet
-    if (Platform.OS === "web") {
-      const mapId = `map-${Math.random().toString(36).substr(2, 9)}`;
-      const mapRef = useRef<any>(null);
+    // Hooks must be at top level - declare for both web and native
+    const mapId = React.useMemo(
+      () => `map-${Math.random().toString(36).substr(2, 9)}`,
+      [],
+    );
+    const mapRef = useRef<any>(null);
 
-      useEffect(() => {
-        let map: any = null;
+    // Web-specific effect for map initialization
+    useEffect(() => {
+      if (Platform.OS !== "web") return;
+      let map: any = null;
 
-        const initMap = async () => {
-          // Load Leaflet CSS
-          if (!document.getElementById("leaflet-css")) {
-            const css = document.createElement("link");
-            css.id = "leaflet-css";
-            css.rel = "stylesheet";
-            css.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
-            css.integrity = "sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=";
-            css.crossOrigin = "";
-            document.head.appendChild(css);
-          }
+      const initMap = async () => {
+        // Load Leaflet CSS
+        if (!document.getElementById("leaflet-css")) {
+          const css = document.createElement("link");
+          css.id = "leaflet-css";
+          css.rel = "stylesheet";
+          css.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+          css.integrity = "sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=";
+          css.crossOrigin = "";
+          document.head.appendChild(css);
+        }
 
-          // Load Leaflet JS
-          if (!(window as any).L) {
-            return new Promise<void>((resolve) => {
-              const script = document.createElement("script");
-              script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-              script.integrity = "sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=";
-              script.crossOrigin = "";
-              script.onload = () => {
-                setTimeout(() => {
-                  createMap();
-                  resolve();
-                }, 100);
-              };
-              document.head.appendChild(script);
-            });
-          } else {
-            createMap();
-          }
-        };
+        // Load Leaflet JS
+        if (!(window as any).L) {
+          return new Promise<void>((resolve) => {
+            const script = document.createElement("script");
+            script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+            script.integrity =
+              "sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=";
+            script.crossOrigin = "";
+            script.onload = () => {
+              setTimeout(() => {
+                createMap();
+                resolve();
+              }, 100);
+            };
+            document.head.appendChild(script);
+          });
+        } else {
+          createMap();
+        }
+      };
 
-        const createMap = () => {
-          const mapElement = document.getElementById(mapId);
-          if (!mapElement || !(window as any).L) return;
+      const createMap = () => {
+        const mapElement = document.getElementById(mapId);
+        if (!mapElement || !(window as any).L) return;
 
-          try {
-            map = (window as any).L.map(mapId, {
-              zoomControl: true,
-              attributionControl: true,
-            }).setView([center.latitude, center.longitude], 15);
+        try {
+          map = (window as any).L.map(mapId, {
+            zoomControl: true,
+            attributionControl: true,
+          }).setView([center.latitude, center.longitude], 15);
 
-            // Add tile layer
-            (window as any).L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          // Add tile layer
+          (window as any).L.tileLayer(
+            "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+            {
               attribution: "© OpenStreetMap contributors",
               maxZoom: 19,
-            }).addTo(map);
+            },
+          ).addTo(map);
 
-            // Add click handler for location selection
-            if (interactive && onLocationSelect) {
-              map.on("click", (e: any) => {
-                const location = {
-                  latitude: e.latlng.lat,
-                  longitude: e.latlng.lng,
-                };
-                onLocationSelect(location);
-              });
-            }
-
-            // Add markers
-            markers.forEach((marker) => {
-              let leafletMarker;
-
-              if (marker.icon) {
-                const icon = (window as any).L.icon({
-                  iconUrl: marker.icon,
-                  iconSize: [32, 32],
-                  iconAnchor: [16, 32],
-                  popupAnchor: [0, -32],
-                });
-                leafletMarker = (window as any).L.marker(
-                  [marker.location.latitude, marker.location.longitude],
-                  { icon }
-                ).addTo(map);
-              } else {
-                leafletMarker = (window as any).L.marker([
-                  marker.location.latitude,
-                  marker.location.longitude,
-                ]).addTo(map);
-              }
-
-              if (marker.title) {
-                leafletMarker.bindPopup(marker.title);
-              }
-
-              if (onMarkerPress) {
-                leafletMarker.on("click", () => {
-                  onMarkerPress(marker.id);
-                });
-              }
+          // Add click handler for location selection
+          if (interactive && onLocationSelect) {
+            map.on("click", (e: any) => {
+              const location = {
+                latitude: e.latlng.lat,
+                longitude: e.latlng.lng,
+              };
+              onLocationSelect(location);
             });
-
-            // Add polylines
-            polylines.forEach((polyline) => {
-              const latlngs = polyline.path.map((point) => [point.latitude, point.longitude]);
-              (window as any).L.polyline(latlngs, {
-                color: polyline.color || "#3388ff",
-                weight: polyline.weight || 3,
-                opacity: 0.8,
-              }).addTo(map);
-            });
-
-            mapRef.current = map;
-          } catch (error) {
-            console.error("Error creating map:", error);
           }
-        };
 
-        initMap();
-
-        return () => {
-          if (map) {
-            map.remove();
-          }
-        };
-      }, [mapId, center.latitude, center.longitude]);
-
-      // Update markers when they change
-      useEffect(() => {
-        if (mapRef.current && (window as any).L) {
-          // Clear existing markers and add new ones
-          // This is a simplified approach - in production you'd want more sophisticated marker management
-          mapRef.current.eachLayer((layer: any) => {
-            if (layer instanceof (window as any).L.Marker) {
-              mapRef.current.removeLayer(layer);
-            }
-          });
-
+          // Add markers
           markers.forEach((marker) => {
             let leafletMarker;
 
@@ -458,13 +417,33 @@ const MapView = forwardRef<MapViewRef, MapViewProps>(
               });
               leafletMarker = (window as any).L.marker(
                 [marker.location.latitude, marker.location.longitude],
-                { icon }
-              ).addTo(mapRef.current);
+                { icon },
+              ).addTo(map);
+            } else if (marker.color) {
+              // Use custom colored marker with divIcon
+              const icon = (window as any).L.divIcon({
+                className: "custom-colored-marker",
+                html: `<div style="
+                  background-color: ${marker.color};
+                  width: 24px;
+                  height: 24px;
+                  border-radius: 50%;
+                  border: 3px solid white;
+                  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+                "></div>`,
+                iconSize: [24, 24],
+                iconAnchor: [12, 12],
+                popupAnchor: [0, -12],
+              });
+              leafletMarker = (window as any).L.marker(
+                [marker.location.latitude, marker.location.longitude],
+                { icon },
+              ).addTo(map);
             } else {
               leafletMarker = (window as any).L.marker([
                 marker.location.latitude,
                 marker.location.longitude,
-              ]).addTo(mapRef.current);
+              ]).addTo(map);
             }
 
             if (marker.title) {
@@ -477,11 +456,150 @@ const MapView = forwardRef<MapViewRef, MapViewProps>(
               });
             }
           });
-        }
-      }, [markers]);
 
+          // Add polylines
+          polylines.forEach((polyline) => {
+            const latlngs = polyline.path.map((point) => [
+              point.latitude,
+              point.longitude,
+            ]);
+            (window as any).L.polyline(latlngs, {
+              color: polyline.color || "#3388ff",
+              weight: polyline.weight || 3,
+              opacity: 0.8,
+            }).addTo(map);
+          });
+
+          mapRef.current = map;
+        } catch (error) {
+          console.error("Error creating map:", error);
+        }
+      };
+
+      initMap();
+
+      return () => {
+        if (map) {
+          map.remove();
+        }
+      };
+    }, [mapId]);
+
+    // Update map center when it changes
+    useEffect(() => {
+      if (Platform.OS !== "web") return;
+
+      if (mapRef.current && (window as any).L) {
+        mapRef.current.setView([center.latitude, center.longitude], 15);
+      }
+    }, [center.latitude, center.longitude]);
+
+    // Update markers when they change
+    useEffect(() => {
+      if (Platform.OS !== "web") return;
+
+      if (mapRef.current && (window as any).L) {
+        // Clear existing markers and add new ones
+        // This is a simplified approach - in production you'd want more sophisticated marker management
+        mapRef.current.eachLayer((layer: any) => {
+          if (layer instanceof (window as any).L.Marker) {
+            mapRef.current.removeLayer(layer);
+          }
+        });
+
+        markers.forEach((marker) => {
+          let leafletMarker;
+
+          if (marker.icon) {
+            const icon = (window as any).L.icon({
+              iconUrl: marker.icon,
+              iconSize: [32, 32],
+              iconAnchor: [16, 32],
+              popupAnchor: [0, -32],
+            });
+            leafletMarker = (window as any).L.marker(
+              [marker.location.latitude, marker.location.longitude],
+              { icon },
+            ).addTo(mapRef.current);
+          } else if (marker.color) {
+            // Use custom colored marker with divIcon
+            const icon = (window as any).L.divIcon({
+              className: "custom-colored-marker",
+              html: `<div style="
+                background-color: ${marker.color};
+                width: 24px;
+                height: 24px;
+                border-radius: 50%;
+                border: 3px solid white;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+              "></div>`,
+              iconSize: [24, 24],
+              iconAnchor: [12, 12],
+              popupAnchor: [0, -12],
+            });
+            leafletMarker = (window as any).L.marker(
+              [marker.location.latitude, marker.location.longitude],
+              { icon },
+            ).addTo(mapRef.current);
+          } else {
+            leafletMarker = (window as any).L.marker([
+              marker.location.latitude,
+              marker.location.longitude,
+            ]).addTo(mapRef.current);
+          }
+
+          if (marker.title) {
+            leafletMarker.bindPopup(marker.title);
+          }
+
+          if (onMarkerPress) {
+            leafletMarker.on("click", () => {
+              onMarkerPress(marker.id);
+            });
+          }
+        });
+      }
+    }, [markers, onMarkerPress]);
+
+    // Update polylines when they change
+    useEffect(() => {
+      if (Platform.OS !== "web") return;
+
+      if (mapRef.current && (window as any).L) {
+        // Clear existing polylines
+        mapRef.current.eachLayer((layer: any) => {
+          if (
+            layer instanceof (window as any).L.Polyline &&
+            !(layer instanceof (window as any).L.Marker)
+          ) {
+            mapRef.current.removeLayer(layer);
+          }
+        });
+
+        // Add new polylines
+        polylines.forEach((polyline) => {
+          if (polyline.path && polyline.path.length >= 2) {
+            const latlngs = polyline.path.map((point) => [
+              point.latitude,
+              point.longitude,
+            ]);
+            (window as any).L.polyline(latlngs, {
+              color: polyline.color || "#3388ff",
+              weight: polyline.weight || 3,
+              opacity: 0.8,
+            }).addTo(mapRef.current);
+          }
+        });
+      }
+    }, [polylines]);
+
+    // Render web implementation
+    if (Platform.OS === "web") {
       return (
-        <View className={`rounded-xl overflow-hidden ${className}`} style={{ height }}>
+        <View
+          className={`rounded-xl overflow-hidden ${className}`}
+          style={{ height }}
+        >
           <div
             id={mapId}
             style={{
@@ -494,9 +612,12 @@ const MapView = forwardRef<MapViewRef, MapViewProps>(
       );
     }
 
-    // Native implementation using WebView
+    // Render native implementation using WebView
     return (
-      <View className={`rounded-xl overflow-hidden ${className}`} style={{ height }}>
+      <View
+        className={`rounded-xl overflow-hidden ${className}`}
+        style={{ height }}
+      >
         <WebView
           ref={webViewRef}
           source={{ html: generateMapHTML() }}
@@ -513,7 +634,7 @@ const MapView = forwardRef<MapViewRef, MapViewProps>(
         />
       </View>
     );
-  }
+  },
 );
 
 MapView.displayName = "MapView";

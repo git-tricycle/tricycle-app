@@ -1,4 +1,8 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native";
+import {
+  DarkTheme,
+  DefaultTheme,
+  ThemeProvider,
+} from "@react-navigation/native";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useFonts } from "expo-font";
@@ -80,7 +84,10 @@ export default function RootLayout() {
           <Stack.Screen name="(driver)" />
           <Stack.Screen name="(admin)" />
           <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="modal" options={{ presentation: "modal", title: "Modal" }} />
+          <Stack.Screen
+            name="modal"
+            options={{ presentation: "modal", title: "Modal" }}
+          />
         </Stack>
         <StatusBar style="auto" />
         {Platform.OS === "web" && <PWAPrompt />}
